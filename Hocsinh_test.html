@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HỆ THỐNG THI THÔNG MINH - Tích Hợp 3 Phần</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/matchbrackets.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/JSCPP@2.0.6/dist/JSCPP.es5.min.js"></script>
+</head>
+<body class="bg-slate-100 pb-10">
+
+    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto p-4 flex justify-between items-center">
+            <div>
+                <h1 id="exam-header-name" class="font-black text-xl uppercase italic tracking-wider">Đang tải đề thi...</h1>
+                <p id="student-display" class="text-xs font-bold text-indigo-200 mt-1 uppercase tracking-widest"></p>
+            </div>
+            <div id="timer" class="bg-white text-red-600 px-4 py-2 rounded-2xl font-mono font-black text-2xl shadow-inner border-2 border-red-100">00:00</div>
+        </div>
+        <div class="bg-indigo-800 px-4 flex justify-center gap-4 pt-2">
+            <button onclick="switchTab('tab-mcq')" id="btn-tab-mcq" class="tab-btn px-6 py-3 bg-white text-indigo-700 font-black rounded-t-xl hidden">Phần 1: Trắc Nghiệm</button>
+            <button onclick="switchTab('tab-essay')" id="btn-tab-essay" class="tab-btn px-6 py-3 bg-indigo-900 text-indigo-200 font-bold rounded-t-xl hidden">Phần 2: Tự Luận</button>
+            <button onclick="switchTab('tab-code')" id="btn-tab-code" class="tab-btn px-6 py-3 bg-indigo-900 text-indigo-200 font-bold rounded-t-xl hidden">Phần 3: Lập Trình</button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto p-4 mt-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <div class="lg:col-span-1 order-2 lg:order-1">
+            <div class="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-200 sticky top-40">
+                <div id="mcq-nav-box" class="hidden">
+                    <h3 class="font-black text-slate-700 mb-4 text-center uppercase text-xs border-b pb-2 tracking-tighter">Tiến độ Trắc nghiệm</h3>
+                    <div id="question-navigation" class="grid grid-cols-5 gap-2 mb-6"></div>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="saveDraft()" class="w-full bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition-all shadow-md">💾 Lưu Tạm</button>
+                    <button id="btn-nop-bai" onclick="confirmSubmit()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-lg hover:bg-emerald-700 transition-all shadow-lg uppercase">🚀 Nộp Bài Thi</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-3 order-1 lg:order-2">
+            
+            <div id="tab-mcq" class="tab-content bg-white p-8 rounded-[2.5rem] shadow-md border border-slate-200 min-h-[500px] flex flex-col justify-between hidden">
+                <div id="question-content"></div>
+                <div class="flex justify-between mt-10 pt-6 border-t border-slate-100">
+                    <button id="prev-btn" onclick="changeQuestion(currentIdx - 1)" class="px-8 py-3 rounded-xl font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">← CÂU TRƯỚC</button>
+                    <button id="next-btn" onclick="changeQuestion(currentIdx + 1)" class="px-8 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700">CÂU TIẾP THEO →</button>
+                </div>
+            </div>
+
+            <div id="tab-essay" class="tab-content bg-white p-8 rounded-[2.5rem] shadow-md border border-slate-200 hidden">
+                <h2 class="text-xl font-black text-slate-800 uppercase mb-4 border-b-2 border-indigo-100 pb-2">Đề bài Tự Luận</h2>
+                <div id="essay-container"></div>
+            </div>
+
+            <div id="tab-code" class="tab-content bg-white p-8 rounded-[2.5rem] shadow-md border border-slate-200 hidden">
+                <h2 id="code-header" class="text-xl font-black text-slate-800 uppercase mb-4 border-b-2 border-indigo-100 pb-2">Đề bài Lập Trình</h2>
+                <div id="code-container"></div>
+            </div>
+        </div>
+    </main>
+
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-900/90 z-[100] hidden flex-col justify-center items-center backdrop-blur-sm">
+        <div class="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 class="text-white text-xl font-black uppercase tracking-widest text-center">Hệ thống đang thu bài<br>Và AI Đang Phân Tích Barem...</h2>
+        <p class="text-amber-300 text-sm mt-2 font-bold bg-amber-900/50 px-4 py-2 rounded-lg">⚠️ Vui lòng KHÔNG đóng trình duyệt lúc này!</p>
+        <div id="loading-status" class="mt-4 text-emerald-400 font-mono text-sm font-bold">Đang chuẩn bị dữ liệu...</div>
+    </div>
+
+    <div id="result-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md hidden z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-[3rem] p-10 max-w-lg w-full text-center shadow-2xl">
+            <div class="text-6xl mb-4">🏆</div>
+            <h2 class="text-3xl font-black text-slate-800 uppercase mb-1">ĐÃ NỘP BÀI THÀNH CÔNG</h2>
+            <p id="res-name-display" class="font-bold text-indigo-500 mb-6 uppercase"></p>
+            <div class="bg-indigo-50 p-6 rounded-3xl mb-6">
+                <p class="text-xs font-black uppercase text-indigo-400 mb-1">BẢNG ĐIỂM CHI TIẾT</p>
+                <div class="flex justify-between items-center bg-white p-3 rounded-xl mb-2">
+                    <span class="font-bold text-slate-600">Trắc nghiệm:</span>
+                    <span id="res-mcq-score" class="font-black text-xl text-indigo-700">0.0</span>
+                </div>
+                <div class="flex justify-between items-center bg-white p-3 rounded-xl mb-2">
+                    <span class="font-bold text-slate-600">Tự luận (AI Chấm Barem):</span>
+                    <span id="res-essay-score" class="font-black text-xl text-orange-600">0.0</span>
+                </div>
+                <div class="flex justify-between items-center bg-white p-3 rounded-xl mb-4">
+                    <span class="font-bold text-slate-600">Lập trình (AI + Test Code):</span>
+                    <span id="res-code-score" class="font-black text-xl text-emerald-600">0.0</span>
+                </div>
+                <div class="border-t-2 border-indigo-100 pt-3">
+                    <p class="text-sm font-bold text-slate-600">TỔNG ĐIỂM:</p>
+                    <p id="res-total-score" class="text-5xl font-black text-red-600 mt-1">0.0</p>
+                </div>
+            </div>
+            <button onclick="window.location.href='index.html'" class="w-full bg-slate-800 text-white py-4 rounded-2xl font-black text-lg hover:bg-slate-700">HOÀN TẤT & THOÁT</button>
+        </div>
+    </div>
+
+<script>
+    // --- 1. CẤU HÌNH API VÀ FIREBASE ---
+    const GEMINI_API_KEY = "AIzaSyD4EOau9bdPfyFPpHXYiFybUZAsXCL5dpE"; 
+    
+    const firebaseConfig = { 
+        apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4", 
+        authDomain: "chamcode-b55f7.firebaseapp.com", 
+        databaseURL: "https://chamcode-b55f7-default-rtdb.firebaseio.com", 
+        projectId: "chamcode-b55f7", 
+        storageBucket: "chamcode-b55f7.firebasestorage.app", 
+        messagingSenderId: "543967582205", 
+        appId: "1:543967582205:web:9075e178c8df5a9c0f6b94" 
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig); 
+    const db = firebase.database();
+
+    const school = localStorage.getItem('schoolName'); 
+    const myName = localStorage.getItem('currentUserName'); 
+    const myClass = localStorage.getItem('currentClass');
+    
+    let examId = null; let examData = null; 
+    let questions = []; let answers = {}; let currentIdx = 0;
+    window.codeEditors = {}; let timerInterval = null;
+
+    // --- 2. HÀM DỌN RÁC INPUT PYTHON (ĐÃ FIX REGEX CHUẨN HƠN) ---
+    // Biến input("Nhập a: ") thành input() một cách an toàn
+    // Thay thế hàm cleanPythonCode cũ bằng hàm này
+function cleanPythonCode(code) {
+    if (!code) return "";
+    // Cách này sẽ "xóa sạch" mọi thứ nằm trong ngoặc của hàm input
+    // Dù học sinh viết input("Nhập a: ") hay input(prompt) đều bị biến thành input()
+    return code.replace(/input\s*\([^)]*\)/g, 'input()');
+}
+
+    // --- 3. KHỞI ĐỘNG HỆ THỐNG ---
+    window.onload = function() {
+        if (!school || !myName || !myClass) return window.location.href = 'index.html';
+        document.getElementById('student-display').innerText = `Học sinh: ${myName} | Lớp: ${myClass}`;
+        
+        loadSpecificExam();
+        
+        const engineBox = document.createElement('div');
+        engineBox.style.cssText = "position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; gap:10px;";
+        document.body.appendChild(engineBox);
+        setInterval(() => {
+            let pyStatus = typeof Sk !== 'undefined' ? '<span class="bg-emerald-500 text-white px-3 py-2 rounded-xl shadow-lg font-black text-xs border border-emerald-300">✅ Python Sẵn Sàng</span>' : '<span class="bg-red-500 text-white px-3 py-2 rounded-xl shadow-lg font-black text-xs border border-red-300 animate-pulse">⏳ Đang tải Python...</span>';
+            engineBox.innerHTML = pyStatus;
+        }, 2000);
+    };
+
+    // --- 4. TẢI VÀ RENDER ĐỀ THI ---
+    function loadSpecificExam() {
+        const selectedExamId = localStorage.getItem('activeExamId');
+        if (!selectedExamId) return window.location.href = 'index.html';
+
+        db.ref(`schools/${school}/exams/${selectedExamId}`).once('value').then(snapshot => {
+            examData = snapshot.val();
+            if (!examData || examData.status !== "active") return window.location.href = 'index.html';
+
+            examId = examData.id || selectedExamId;
+            document.getElementById('exam-header-name').innerText = examData.name || "Đề thi";
+            
+            questions = examData.questions ? examData.questions.filter(q => !q.type || q.type === 'mc') : [];
+            if (questions.length > 0) {
+                document.getElementById('btn-tab-mcq').classList.remove('hidden');
+                document.getElementById('mcq-nav-box').classList.remove('hidden'); 
+                renderNav(); changeQuestion(0);
+            }
+            
+            let hasEssay = false; const essayContainer = document.getElementById('essay-container');
+            const sourceEssays = examData.essays || examData.essayQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'essay') : []);
+            if (sourceEssays && sourceEssays.length > 0) {
+                hasEssay = true; document.getElementById('btn-tab-essay').classList.remove('hidden');
+                sourceEssays.forEach((q, idx) => {
+                    let qHtml = typeof q === 'string' ? q : (q.content || q.questionHtml || q.questionText);
+                    essayContainer.innerHTML += `
+                        <div class="mb-8 p-6 bg-slate-50 border rounded-2xl shadow-sm">
+                            <h3 class="font-black text-indigo-700 mb-3 text-lg">👉 Câu ${idx + 1}:</h3>
+                            <div class="prose max-w-none text-slate-800 mb-4 bg-white p-4 rounded-xl">${qHtml}</div>
+                            <textarea id="essay-ans-${idx}" class="w-full h-32 p-4 border-2 border-indigo-200 rounded-xl outline-none focus:border-indigo-500" placeholder="Gõ câu trả lời tự luận vào đây..."></textarea>
+                        </div>`;
+                });
+            }
+
+            let hasCode = false; const codeContainer = document.getElementById('code-container');
+            const sourceCodes = examData.codes || examData.codeQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'code') : []);
+            
+            if (sourceCodes && sourceCodes.length > 0) {
+                hasCode = true; document.getElementById('btn-tab-code').classList.remove('hidden');
+                
+                sourceCodes.forEach((q, idx) => {
+                    let qHtml = q.content || q.questionHtml || q.desc || "Mô tả đề bài";
+                    let score = q.rubrics ? q.rubrics.reduce((s,r)=>s+r.score,0) : (q.score || 1);
+                    let input = q.testInput || q.input || ""; 
+                    let expected = q.expectedOutput || q.expected || ""; 
+                    let defaultLang = q.lang || "python";
+
+                    codeContainer.innerHTML += `
+                    <div class="mb-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl shadow-sm">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-black text-indigo-700 text-lg">💻 Câu Lập trình #${idx + 1}</h3>
+                            <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full">${score} Điểm</span>
+                        </div>
+                        <div class="text-slate-800 mb-4 bg-white p-4 border rounded-xl">${qHtml.replace(/\n/g, '<br>')}</div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="bg-indigo-50 p-3 rounded-lg border">
+                                <p class="text-[10px] font-black text-indigo-500 uppercase mb-1">Input Test</p>
+                                <textarea id="stu-input-${idx}" class="w-full h-20 text-sm font-mono text-slate-800 bg-white p-2 rounded border border-indigo-200 outline-none focus:border-indigo-500">${input}</textarea>
+                            </div>
+                            <div class="bg-emerald-50 p-3 rounded-lg border">
+                                <p class="text-[10px] font-black text-emerald-600 uppercase mb-1">Output Mong đợi</p>
+                                <pre id="stu-expected-${idx}" class="text-sm font-mono text-emerald-700 font-bold bg-white p-2 rounded border border-emerald-200 h-20 overflow-y-auto">${expected || '(Không có)'}</pre>
+                            </div>
+                        </div>
+
+                        <div class="border-2 border-slate-800 rounded-xl overflow-hidden shadow-lg">
+                            <div class="bg-slate-800 px-3 py-2 flex justify-between items-center">
+                                <span class="text-white text-xs font-bold">Viết Code:</span>
+                                <select id="stu-lang-${idx}" onchange="window.codeEditors[${idx}].setOption('mode', this.value === 'cpp' ? 'text/x-c++src' : 'python')" class="text-xs p-1 rounded font-bold">
+                                    <option value="python" ${defaultLang === 'python' ? 'selected' : ''}>Python</option>
+                                    <option value="cpp" ${defaultLang === 'cpp' ? 'selected' : ''}>C++</option>
+                                </select>
+                            </div>
+                            <textarea id="stu-editor-${idx}"></textarea>
+                        </div>
+                        
+                        <div class="mt-3 bg-slate-800 p-4 rounded-xl">
+                            <div class="flex items-center gap-4 mb-2">
+                                <button onclick="runStudentCode(${idx})" class="bg-emerald-500 text-white font-bold py-2 px-5 rounded-lg text-sm hover:bg-emerald-400 shadow-md">▶ Chạy Test Thử</button>
+                                <div id="stu-status-${idx}"></div>
+                            </div>
+                            <pre id="stu-output-${idx}" class="text-green-400 font-mono text-sm bg-black p-3 rounded-lg min-h-[60px] whitespace-pre-wrap"></pre>
+                        </div>
+                    </div>`;
+                });
+                
+                setTimeout(() => {
+                    sourceCodes.forEach((q, idx) => {
+                        let currentLang = document.getElementById(`stu-lang-${idx}`).value;
+                        window.codeEditors[idx] = CodeMirror.fromTextArea(document.getElementById(`stu-editor-${idx}`), {
+                            mode: currentLang === "cpp" ? "text/x-c++src" : "python", 
+                            theme: "dracula", lineNumbers: true, autoCloseBrackets: true, matchBrackets: true
+                        });
+                        window.codeEditors[idx].setSize("100%", "300px");
+                    });
+                }, 100);
+            }
+
+            if (questions.length > 0) switchTab('tab-mcq');
+            else if (hasEssay) switchTab('tab-essay');
+            else if (hasCode) switchTab('tab-code');
+
+            restoreDraft(); 
+            if (examData.timeLimit) startTimer(examData.timeLimit);
+        });
+    }
+
+    // --- 5. HỌC SINH CHẠY THỬ CODE ---
+    window.runStudentCode = function(idx) {
+        try {
+            const editor = window.codeEditors[idx];
+            if (!editor) return alert("Lỗi: Không tìm thấy khung Code!");
+
+            let code = editor.getValue();
+            const inputData = document.getElementById(`stu-input-${idx}`).value;
+            const expectedData = document.getElementById(`stu-expected-${idx}`).innerText.trim();
+            const lang = document.getElementById(`stu-lang-${idx}`).value;
+            
+            const statusBox = document.getElementById(`stu-status-${idx}`);
+            const outBox = document.getElementById(`stu-output-${idx}`);
+
+            if (!code.trim()) return alert("Vui lòng viết code trước khi chạy!");
+            
+            statusBox.innerHTML = "<span class='font-bold text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700'>⏳ Đang chạy...</span>";
+            outBox.innerText = "⏳ Hệ thống đang biên dịch code..."; 
+
+            if (lang === 'python') {
+                if (typeof Sk === "undefined") { outBox.innerText = "❌ Lỗi: Thư viện Python chưa tải xong."; return; }
+                
+                code = cleanPythonCode(code);
+                
+                let inputLines = inputData ? inputData.replace(/\r/g, '').split('\n') : []; 
+                let inputIdx = 0; let actualOut = "";
+                
+                Sk.configure({
+                    output: function(text) { actualOut += text; },
+                    read: function(x) { if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) throw "File not found"; return Sk.builtinFiles["files"][x]; },
+                    inputfun: function() { return new Promise(resolve => resolve(inputIdx < inputLines.length ? inputLines[inputIdx++] : "")); }
+                });
+                
+                Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, code, true))
+                .then(() => { 
+                    outBox.innerText = actualOut || "(Code chạy thành công nhưng không in ra gì)"; 
+                    checkStudentOutput(actualOut, expectedData, statusBox); 
+                })
+                .catch(err => { 
+                    statusBox.innerHTML = "<span class='font-bold text-xs px-2 py-1 rounded bg-red-100 text-red-700'>❌ Lỗi Code</span>";
+                    outBox.innerText = actualOut + "\n❌ Lỗi Cú pháp Python:\n" + err.toString(); 
+                });
+                
+            } else if (lang === 'cpp') {
+                if (typeof JSCPP === "undefined") { outBox.innerText = "❌ Lỗi: Thư viện C++ chưa sẵn sàng."; return; }
+                let actualOut = ""; let config = { stdio: { write: function(s) { actualOut += s; } } };
+                try {
+                    JSCPP.run(code, inputData, config);
+                    outBox.innerText = actualOut || "(Code chạy thành công nhưng không in ra gì)"; 
+                    checkStudentOutput(actualOut, expectedData, statusBox);
+                } catch(cppErr) { 
+                    statusBox.innerHTML = "<span class='font-bold text-xs px-2 py-1 rounded bg-red-100 text-red-700'>❌ Lỗi Code</span>";
+                    outBox.innerText = "❌ Lỗi biên dịch C++:\n" + cppErr.message; 
+                }
+            }
+        } catch (error) { alert("Lỗi Hệ thống Web: " + error.message); }
+    };
+
+    function checkStudentOutput(actual, expected, statusBox) {
+        let act = actual.trim(); let exp = expected.trim();
+        if(exp === "") { statusBox.innerHTML = "<span class='font-bold text-xs px-2 py-1 rounded bg-amber-100 text-amber-700'>⚠️ Code chạy tốt (Không có test mẫu)</span>"; }
+        else if(act === exp) { statusBox.innerHTML = "<span class='font-bold text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700'>✅ KHỚP KẾT QUẢ TEST MẪU</span>"; }
+        else { statusBox.innerHTML = "<span class='font-bold text-xs px-2 py-1 rounded bg-red-100 text-red-700'>❌ CHƯA KHỚP KẾT QUẢ TEST</span>"; }
+    }
+
+    // --- 6. AI CHẤM ĐIỂM TỰ LUẬN DỰA THEO BAREM (ĐÃ NÂNG CẤP PROMPT) ---
+    // Thay thế hàm goiAIGoogle cũ bằng hàm này
+// 1. HÀM CHẤM TỰ LUẬN (ÉP AI CHẤM CHI TIẾT THEO BAREM)
+async function goiAIGoogle(deBai, barem, tongDiem, baiLam) {
+    if (!baiLam || baiLam.trim() === "") return { score: 0, feedback: "Học sinh không làm bài." };
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const prompt = `Nhiệm vụ: Chấm điểm tự luận của học sinh dựa trên Barem. BẮT BUỘC liệt kê điểm cho TỪNG ý trong Barem. Cấm nhận xét chung chung.
+
+--- VÍ DỤ CÁCH CHẤM CHUẨN MÀ BẠN PHẢI BẮT CHƯỚC ---
+Barem:
+- Nêu đúng định nghĩa (1.0đ)
+- Lấy ví dụ chính xác (1.0đ)
+Bài làm: Khái niệm là X. Ví dụ là Y.
+KẾT QUẢ TRẢ VỀ BẮT BUỘC CỦA BẠN:
+{
+  "score": 2.0,
+  "feedback": "+ 1.0đ: Nêu được đúng khái niệm.\\n+ 1.0đ: Lấy được ví dụ chính xác."
+}
+--------------------------------------------------
+
+THÔNG TIN BÀI LÀM HIỆN TẠI (HÃY CHẤM THEO FORMAT VÍ DỤ TRÊN):
+- Đề bài: "${deBai}"
+- Barem điểm: "${barem}"
+- Tổng điểm tối đa: ${tongDiem}
+- Bài làm của học sinh: 
+"${baiLam}"
+
+Trả về JSON chứa "score" và "feedback" đúng như khuôn mẫu trên.`;
+
+    try {
+        const response = await fetch(url, { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ 
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+            }) 
+        });
+        const data = await response.json();
+        return JSON.parse(data.candidates[0].content.parts[0].text); 
+    } catch (error) { 
+        return { score: 0, feedback: "Lỗi kết nối AI." }; 
+    }
+}
+    // --- 7. CHẠY CODE NGẦM LÚC NỘP BÀI ---
+    function autoGradeCode(code, inputData, expectedData, lang) {
+        return new Promise((resolve) => {
+            let result = { isPass: false, actualOut: "" };
+            if (!code || !code.trim()) return resolve(result);
+            expectedData = expectedData ? expectedData.trim() : "";
+            
+            if (lang === 'python') {
+                if (typeof Sk === "undefined") return resolve(result);
+                code = cleanPythonCode(code); 
+                let actualOut = ""; 
+                let inputLines = inputData ? inputData.replace(/\r/g, '').trim().split('\n') : []; 
+                let inputIdx = 0;
+                
+                Sk.configure({
+                    output: function(text) { actualOut += text; },
+                    read: function(x) { if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) throw "File not found"; return Sk.builtinFiles["files"][x]; },
+                    inputfun: function() { return new Promise(r => r(inputIdx < inputLines.length ? inputLines[inputIdx++] : "")); }
+                });
+                Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, code, true))
+                .then(() => { 
+                    result.actualOut = actualOut; 
+                    result.isPass = (expectedData !== "" && actualOut.trim() === expectedData); 
+                    resolve(result); 
+                })
+                .catch((err) => { 
+                    result.actualOut = "Lỗi cú pháp: " + err.toString(); 
+                    resolve(result); 
+                });
+            } else if (lang === 'cpp') {
+                if (typeof JSCPP === "undefined") return resolve(result);
+                let actualOut = ""; let config = { stdio: { write: function(s) { actualOut += s; } } };
+                try {
+                    JSCPP.run(code, inputData, config);
+                    result.actualOut = actualOut;
+                    result.isPass = (expectedData !== "" && actualOut.trim() === expectedData);
+                    resolve(result);
+                } catch (e) { result.actualOut = "Lỗi biên dịch"; resolve(result); }
+            } else resolve(result);
+        });
+    }
+
+    // --- 8. AI CHẤM THUẬT TOÁN LẬP TRÌNH (ĐÃ NÂNG CẤP PROMPT) ---
+    // Thay thế hàm goiAIGoogleCode cũ bằng hàm này
+// HÀM CHẤM LẬP TRÌNH (ÉP BUỘC KHUÔN MẪU FEEDBACK)
+async function goiAIGoogleCode(deBai, barem, tongDiem, code, testStatus, expectedData) {
+    if (!code || code.trim() === "") return { score: 0, feedback: "Học sinh chưa nộp code." };
+    
+    // Lưu ý: Thay GEMINI_API_KEY bằng biến chứa key của bạn trong file
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const prompt = `BẠN LÀ GIÁM KHẢO CHẤM THI LẬP TRÌNH KHÓ TÍNH NHẤT.
+YÊU CẦU TỐI THƯỢNG: TUYỆT ĐỐI KHÔNG ĐƯỢC NHẬN XÉT CHUNG CHUNG NHƯ "Code chính xác", "Làm đúng", "Tốt". NẾU VI PHẠM SẼ BỊ PHẠT!
+BẠN BẮT BUỘC PHẢI TỰ CHIA TỔNG ${tongDiem} ĐIỂM RA THÀNH 3 PHẦN CHI TIẾT (dù có barem hay không).
+
+THÔNG TIN BÀI LÀM:
+- Đề bài: ${deBai || "Bài tập thuật toán"}
+- Trạng thái: ${testStatus.isPass ? "Code chạy ĐÚNG Output" : "Code chạy SAI/LỖI Output"}
+- Code học sinh nộp: \n${code}
+
+BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON NHƯ MẪU DƯỚI ĐÂY (Chỉ trả về JSON, không nói thêm gì):
+{
+  "score": ${testStatus.isPass ? tongDiem : (tongDiem / 2)},
+  "feedback": "+ Cú pháp và khai báo (20% điểm): [Nhận xét chi tiết]\\n+ Thuật toán (50% điểm): [Nhận xét chi tiết]\\n+ Output (30% điểm): [Nhận xét chi tiết]"
+}`;
+
+    try {
+        const response = await fetch(url, { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" }, 
+            body: JSON.stringify({ 
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" } // Ép AI trả về JSON
+            }) 
+        });
+        const data = await response.json();
+        let cleanText = data.candidates[0].content.parts[0].text.replace(/```json/g, "").replace(/```/g, "").trim();
+        return JSON.parse(cleanText); 
+    } catch (error) { 
+        return { score: testStatus.isPass ? tongDiem : 0, feedback: "Lỗi kết nối AI hoặc AI trả sai định dạng." }; 
+    }
+}
+    // --- 9. HÀM TỔNG HỢP VÀ NỘP BÀI LÊN FIREBASE ---
+    async function confirmSubmit() {
+        if (!examId) return;
+        if (!confirm("Xác nhận nộp bài? AI sẽ bắt đầu đọc và chấm điểm chi tiết!")) return;
+
+        const btnSubmit = document.getElementById('btn-nop-bai');
+        if(btnSubmit) { btnSubmit.innerText = "⏳ ĐANG CHẤM BÀI..."; btnSubmit.disabled = true; }
+        
+        document.getElementById('loading-overlay').classList.remove('hidden');
+        document.getElementById('loading-overlay').classList.add('flex');
+        const statusText = document.getElementById('loading-status');
+
+        try {
+            statusText.innerText = "⏳ Đang chấm Trắc nghiệm...";
+            let correct = 0;
+            questions.forEach((q, i) => { if ((answers[i] || "") === (q.correctAnswer || q.answer || "")) correct++; });
+            const weights = examData.weights || { mcq: 10, essay: 0, code: 0 };
+            let scoreMCQ = questions.length > 0 ? parseFloat(((correct / questions.length) * (weights.mcq || 10)).toFixed(2)) : 0;
+
+            statusText.innerText = "🤖 AI đang phân tích Barem Tự Luận...";
+            let eAnsStr = ""; let scoreEssay = 0; let aiEssayResults = {};
+            const sourceEssays = examData.essays || examData.essayQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'essay') : []);
+            
+            if (sourceEssays && sourceEssays.length > 0) {
+                const essayBoxes = document.querySelectorAll('textarea[id^="essay-ans-"]');
+                for (let idx = 0; idx < essayBoxes.length; idx++) {
+                    let baiLam = essayBoxes[idx].value.trim();
+                    eAnsStr += `--- CÂU TỰ LUẬN ${idx+1} ---\n${baiLam}\n\n`;
+                    let q = sourceEssays[idx];
+                    let deBai = q.content || q.questionText || "Đề bài tự luận";
+                    let baremStr = q.rubrics && q.rubrics.length > 0 ? q.rubrics.map((r, i) => `- Ý ${i+1}: ${r.text} (${r.score}đ)`).join('\n') : "Chấm theo nội dung";
+                    let tongDiem = q.rubrics && q.rubrics.length > 0 ? q.rubrics.reduce((s, r) => s + r.score, 0) : (q.score || 10);
+                    
+                    let aiRes = await goiAIGoogle(deBai, baremStr, tongDiem, baiLam);
+                    aiEssayResults[`cau_${idx+1}`] = aiRes;
+                    scoreEssay += (aiRes.score || 0);
+                }
+            }
+
+            statusText.innerText = "💻 Đang chạy Test & AI chấm Barem Code...";
+            let cAnsStr = ""; let scoreCode = 0; let aiCodeResults = {};
+            const sourceCodes = examData.codes || examData.codeQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'code') : []);
+            
+            if (sourceCodes && sourceCodes.length > 0) {
+                for (let idx = 0; idx < sourceCodes.length; idx++) {
+                    let q = sourceCodes[idx];
+                    let code = window.codeEditors && window.codeEditors[idx] ? window.codeEditors[idx].getValue().trim() : "";
+                    cAnsStr += `--- CODE CÂU ${idx+1} ---\n${code}\n\n`;
+
+                    let input = document.getElementById(`stu-input-${idx}`) ? document.getElementById(`stu-input-${idx}`).value : (q.testInput || ""); 
+                    let expected = q.expectedOutput || q.expected || ""; 
+                    let lang = document.getElementById(`stu-lang-${idx}`)?.value || "python";
+                    
+                    let deBai = q.content || q.desc || "Câu hỏi lập trình";
+                    let baremStr = q.rubrics && q.rubrics.length > 0 ? q.rubrics.map((r, i) => `- Ý ${i+1}: ${r.text} (${r.score}đ)`).join('\n') : "Chấm Thuật toán";
+                    let tongDiem = q.rubrics && q.rubrics.length > 0 ? q.rubrics.reduce((s,r)=>s+r.score,0) : (parseFloat(q.score) || 1);
+
+                    let testStatus = await autoGradeCode(code, input, expected, lang);
+                    let aiRes = await goiAIGoogleCode(deBai, baremStr, tongDiem, code, testStatus, expected);
+                    
+                    aiCodeResults[`code_${idx+1}`] = aiRes;
+                    scoreCode += (aiRes.score || 0);
+                }
+            }
+
+            let totalScore = parseFloat((scoreMCQ + scoreEssay + scoreCode).toFixed(2));
+
+            statusText.innerText = "💾 Đang xuất bảng điểm lên Máy chủ...";
+            const resultData = {
+                studentName: myName, className: myClass, examId: examId, examName: examData.name,
+                scoreMCQ: scoreMCQ, scoreEssay: scoreEssay, scoreCode: scoreCode, 
+                totalScore: totalScore, correct: correct, total: questions.length,
+                studentAnswers: answers, studentEssay: eAnsStr, studentCode: cAnsStr, time: new Date().toLocaleString(),
+                aiFeedback: { essay: aiEssayResults, code: aiCodeResults }
+            };
+
+            await db.ref(`schools/${school}/results/${examId}/${myName.replace(/\s/g, '_')}`).set(resultData);
+
+            if(typeof timerInterval !== 'undefined') clearInterval(timerInterval); 
+            localStorage.removeItem(`draft_${examId}_${myName}`);
+            
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('res-name-display').innerText = myName;
+            document.getElementById('res-mcq-score').innerText = scoreMCQ + "đ";
+            document.getElementById('res-essay-score').innerText = scoreEssay + "đ";
+            document.getElementById('res-code-score').innerText = scoreCode + "đ";
+            document.getElementById('res-total-score').innerText = totalScore;
+            
+            document.getElementById('result-modal').classList.remove('hidden');
+
+        } catch (error) {
+            console.error(error);
+            alert("Lỗi nộp bài: " + error.message);
+            document.getElementById('loading-overlay').classList.add('hidden');
+            if(btnSubmit) { btnSubmit.innerText = "NỘP BÀI LẠI"; btnSubmit.disabled = false; }
+        }
+    }
+
+    // --- 10. CÁC HÀM UI CƠ BẢN ---
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(el => { el.classList.remove('bg-white', 'text-indigo-700'); el.classList.add('bg-indigo-900', 'text-indigo-200'); });
+        document.getElementById(tabId).classList.remove('hidden');
+        document.getElementById('btn-' + tabId).classList.add('bg-white', 'text-indigo-700');
+        document.getElementById('btn-' + tabId).classList.remove('bg-indigo-900', 'text-indigo-200');
+        document.getElementById('mcq-nav-box').style.display = (tabId === 'tab-mcq') ? 'block' : 'none';
+        if(tabId === 'tab-code') setTimeout(() => { for(let k in window.codeEditors) window.codeEditors[k].refresh(); }, 100);
+    }
+
+    function renderNav() {
+        const nav = document.getElementById('question-navigation'); nav.innerHTML = "";
+        questions.forEach((_, i) => {
+            const isDone = answers[i] !== undefined && answers[i] !== "";
+            nav.innerHTML += `<button id="nav-q-${i}" onclick="changeQuestion(${i})" class="w-full aspect-square flex items-center justify-center rounded-xl border-2 font-bold text-sm ${i === currentIdx ? 'bg-indigo-600 text-white' : (isDone ? 'bg-emerald-500 text-white' : 'bg-white text-slate-400')}">${i + 1}</button>`;
+        });
+    }
+    
+    function changeQuestion(idx) {
+        if (idx < 0 || idx >= questions.length) return; currentIdx = idx; renderNav();
+        const q = questions[idx]; const container = document.getElementById('question-content');
+        let html = `<h2 class="text-2xl font-bold text-slate-800 mb-8">${q.questionText || q.content}</h2><div class="grid grid-cols-1 gap-4">`;
+        let opts = q.options || q.choices || [];
+        opts.forEach((opt, i) => {
+            const isSelected = answers[idx] === ['A','B','C','D'][i];
+            html += `<label class="flex items-center p-5 border-2 ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100'} rounded-[1.5rem] cursor-pointer">
+                        <input type="radio" name="ans-${idx}" value="${['A','B','C','D'][i]}" ${isSelected ? 'checked' : ''} onchange="answers[${idx}]='${['A','B','C','D'][i]}'; changeQuestion(${idx}); saveDraft();" class="mr-4 w-6 h-6">
+                        <span class="text-lg font-semibold">${['A','B','C','D'][i]}. ${typeof opt === 'object' ? opt.text : opt}</span>
+                    </label>`;
+        });
+        container.innerHTML = html + "</div>";
+    }
+
+    function saveDraft() {
+        if (!examId) return; let eAns = []; let cAns = [];
+        document.querySelectorAll('textarea[id^="essay-ans-"]').forEach(box => eAns.push(box.value));
+        const sourceCodes = examData.codes || examData.codeQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'code') : []);
+        if(sourceCodes) sourceCodes.forEach((_, idx) => { cAns.push(window.codeEditors[idx] ? window.codeEditors[idx].getValue() : ""); });
+        localStorage.setItem(`draft_${examId}_${myName}`, JSON.stringify({ ans: answers, essay: eAns, code: cAns }));
+    }
+
+    function restoreDraft() {
+        const saved = localStorage.getItem(`draft_${examId}_${myName}`);
+        if (saved) {
+            try {
+                const draft = JSON.parse(saved); answers = draft.ans || {};
+                if (draft.essay) draft.essay.forEach((val, idx) => { const el = document.getElementById(`essay-ans-${idx}`); if(el) el.value = val; });
+                if (draft.code) draft.code.forEach((val, idx) => { if(window.codeEditors[idx]) window.codeEditors[idx].setValue(val); });
+            } catch (e) {}
+        }
+    }
+
+    function startTimer(min) {
+        let t = min * 60; const el = document.getElementById('timer');
+        timerInterval = setInterval(() => {
+            let m = Math.floor(t / 60); let s = t % 60; el.innerText = `${m<10?'0':''}${m}:${s<10?'0':''}${s}`;
+            if (--t < 0) { clearInterval(timerInterval); alert("Hết giờ! Hệ thống tự động nộp bài."); confirmSubmit(); }
+        }, 1000);
+    }
+</script>
+</body>
+</html>

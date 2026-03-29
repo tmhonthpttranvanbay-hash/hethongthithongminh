@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>QUẢN TRỊ TỐI CAO - HỆ THỐNG THI THÔNG MINH</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>body { background: #f8fafc; font-family: 'Segoe UI', sans-serif; }</style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <div class="w-64 bg-indigo-900 text-white flex flex-col h-full shadow-2xl z-10">
+        <div class="p-6 border-b border-indigo-800 text-center">
+            <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg">
+                <span class="text-3xl">👑</span>
+            </div>
+            <h2 class="font-black text-lg text-white uppercase tracking-wider">SUPER ADMIN</h2>
+        </div>
+        <div class="p-4 space-y-2 flex-1">
+            <button onclick="switchTab('School Admin')" id="tab-schools" class="w-full text-left bg-indigo-800 text-sm py-3 px-4 rounded-xl font-bold transition-all border-l-4 border-emerald-400 shadow-inner">🏫 Quản lý Trường THPT</button>
+            <button onclick="switchTab('Teacher')" id="tab-teachers" class="w-full text-left hover:bg-indigo-800 text-sm py-3 px-4 rounded-xl font-bold transition-all border-l-4 border-transparent text-indigo-200">👨‍🏫 Quản lý Giáo viên</button>
+        </div>
+        <div class="p-4">
+            <button onclick="logout()" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-lg">🚪 Đăng xuất</button>
+        </div>
+    </div>
+
+    <div class="flex-1 flex flex-col h-full overflow-y-auto relative">
+        <div class="bg-white p-5 shadow-sm border-b flex justify-between items-center sticky top-0 z-20">
+            <h1 id="page-title" class="text-xl font-black text-slate-800 uppercase tracking-wide">Danh sách Trường THPT</h1>
+            <button onclick="openModal()" class="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black shadow-lg hover:bg-emerald-500 transition-colors hover:scale-105 transform">+ THÊM TÀI KHOẢN MỚI</button>
+        </div>
+
+        <div class="p-8">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 text-xs uppercase">
+                            <th class="p-4 border-b font-black w-16 text-center">STT</th>
+                            <th class="p-4 border-b font-black">Tên Đăng Nhập</th>
+                            <th class="p-4 border-b font-black">Tên Hiển Thị (Trường/GV)</th>
+                            <th class="p-4 border-b font-black">Mật Khẩu</th>
+                            <th class="p-4 border-b font-black text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="user-table" class="text-sm">
+                        </tbody>
+                </table>
+                
+                <div id="empty-state" class="hidden p-8 text-center text-slate-400 font-bold">
+                    Chưa có tài khoản nào trong danh sách này.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="user-modal" class="hidden fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md transform transition-all scale-100">
+            <div class="flex justify-between items-center mb-6 border-b pb-3">
+                <h2 id="modal-title" class="text-xl font-black text-slate-800 uppercase">THÊM TÀI KHOẢN MỚI</h2>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-red-500 font-black text-xl transition-colors">&times;</button>
+            </div>
+            
+            <input type="hidden" id="u-id">
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1 uppercase">Tên đăng nhập (Username)</label>
+                    <input type="text" id="u-username" class="w-full border-2 border-slate-200 p-3 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-700 bg-slate-50" placeholder="VD: thpt_nguyentrai">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1 uppercase">Tên hiển thị / Họ tên GV</label>
+                    <input type="text" id="u-name" class="w-full border-2 border-slate-200 p-3 rounded-xl outline-none focus:border-indigo-500 font-bold text-slate-800 bg-slate-50" placeholder="VD: THPT Nguyễn Trãi">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1 uppercase">Quyền hạn (Vai trò)</label>
+                    <select id="u-role" class="w-full border-2 border-slate-200 p-3 rounded-xl outline-none focus:border-indigo-500 font-bold text-slate-800 bg-slate-50">
+                        <option value="School Admin">Quản trị Trường (School Admin)</option>
+                        <option value="Teacher">Giáo viên (Teacher)</option>
+                    </select>
+
+                    <div id="u-school-group" class="hidden mt-4">
+                        <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Trường trực thuộc <span class="text-red-500">*</span></label>
+                        <select id="u-school" class="w-full p-3 border-2 border-slate-200 rounded-xl outline-none focus:border-indigo-500 font-bold bg-slate-50 text-slate-700">
+                            </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1 uppercase">Mật khẩu</label>
+                    <input type="text" id="u-pass" class="w-full border-2 border-slate-200 p-3 rounded-xl outline-none focus:border-indigo-500 font-bold text-red-600 bg-slate-50" placeholder="Nhập mật khẩu...">
+                </div>
+            </div>
+            
+            <div class="flex gap-3 mt-8">
+                <button onclick="closeModal()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-300 transition-colors">HỦY BỎ</button>
+                <button onclick="saveUser()" class="flex-1 bg-emerald-600 text-white font-black py-3 rounded-xl hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-500/30">💾 LƯU THÔNG TIN</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CẤU HÌNH FIREBASE
+        const config = {
+            apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4",
+            authDomain: "chamcode-b55f7.firebaseapp.com",
+            databaseURL: "https://chamcode-b55f7-default-rtdb.firebaseio.com",
+            projectId: "chamcode-b55f7",
+            storageBucket: "chamcode-b55f7.firebasestorage.app",
+            messagingSenderId: "543967582205",
+            appId: "1:543967582205:web:9075e178c8df5a9c0f6b94"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(config);
+        const db = firebase.database(); 
+    </script>
+
+    <script>
+        // 1. BIẾN TOÀN CỤC MỚI
+        let users = [];
+        let currentRoleTab = 'School Admin'; 
+
+        // 2. HÀM ĐẨY DỮ LIỆU LÊN FIREBASE (ĐÁM MÂY)
+        function saveToFirebase() {
+            db.ref('users').set(users).then(() => {
+                console.log("Đã đồng bộ thành công lên Firebase!");
+            }).catch(err => {
+                alert("❌ Lỗi đồng bộ Firebase: " + err.message);
+            });
+        }
+
+        // 3. HIỂN THỊ BẢNG (Giữ nguyên giao diện đẹp của bạn)
+        function renderTable() {
+            const tbody = document.getElementById('user-table');
+            const emptyState = document.getElementById('empty-state');
+            
+            const filteredUsers = users.filter(u => u.role === currentRoleTab);
+
+            if (filteredUsers.length === 0) {
+                tbody.innerHTML = "";
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                tbody.innerHTML = filteredUsers.map((u, index) => `
+                    <tr class="hover:bg-slate-50 border-b transition-colors group">
+                        <td class="p-4 text-center font-bold text-slate-400">${index + 1}</td>
+                        <td class="p-4 font-black text-indigo-700">${u.user}</td>
+                        <td class="p-4 font-bold text-slate-700">
+                            ${u.name} 
+                            ${u.school ? `<br><span class="text-[11px] text-slate-500 font-normal">Trường: ${u.school}</span>` : ''}
+                        </td>
+                        <td class="p-4 font-mono text-red-500 bg-red-50 rounded px-2 opacity-50 group-hover:opacity-100 transition-opacity">${u.pass}</td>
+                        <td class="p-4 text-center">
+                            <button onclick="editUser(${u.id})" class="bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white font-bold px-4 py-1.5 rounded-lg text-xs transition-colors mr-2">✏️ Sửa</button>
+                            <button onclick="deleteUser(${u.id})" class="bg-red-100 text-red-700 hover:bg-red-600 hover:text-white font-bold px-4 py-1.5 rounded-lg text-xs transition-colors">🗑️ Xóa</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // 4. CHUYỂN TAB
+        function switchTab(role) {
+            currentRoleTab = role;
+            const btnSchool = document.getElementById('tab-schools');
+            const btnTeacher = document.getElementById('tab-teachers');
+            
+            if (role === 'School Admin') {
+                btnSchool.classList.add('bg-indigo-800', 'border-emerald-400', 'text-white');
+                btnSchool.classList.remove('text-indigo-200');
+                btnTeacher.classList.remove('bg-indigo-800', 'border-emerald-400', 'text-white');
+                btnTeacher.classList.add('text-indigo-200');
+                document.getElementById('page-title').innerText = 'Danh sách Trường THPT';
+            } else {
+                btnTeacher.classList.add('bg-indigo-800', 'border-emerald-400', 'text-white');
+                btnTeacher.classList.remove('text-indigo-200');
+                btnSchool.classList.remove('bg-indigo-800', 'border-emerald-400', 'text-white');
+                btnSchool.classList.add('text-indigo-200');
+                document.getElementById('page-title').innerText = 'Danh sách Giáo viên';
+            }
+            renderTable();
+        }
+
+        // 5. LẮNG NGHE ĐỔI VAI TRÒ
+        document.getElementById('u-role').addEventListener('change', function() {
+            const schoolGroup = document.getElementById('u-school-group');
+            const schoolSelect = document.getElementById('u-school');
+
+            if (this.value === 'Teacher') {
+                schoolGroup.classList.remove('hidden'); 
+                
+                const schools = users.filter(u => u.role === 'School Admin');
+                schoolSelect.innerHTML = '<option value="">-- Chọn Trường --</option>';
+                schools.forEach(s => {
+                    schoolSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
+                });
+
+                if (schools.length === 0) {
+                    schoolSelect.innerHTML = '<option value="">⚠️ Chưa có Trường nào! Hãy tạo Trường trước.</option>';
+                }
+            } else {
+                schoolGroup.classList.add('hidden'); 
+            }
+        });
+
+        // 6. MỞ / ĐÓNG MODAL
+        function openModal(isEdit = false) {
+            document.getElementById('user-modal').classList.remove('hidden');
+            if(!isEdit) {
+                document.getElementById('modal-title').innerText = "THÊM MỚI TÀI KHOẢN";
+                document.getElementById('u-id').value = '';
+                document.getElementById('u-username').value = '';
+                document.getElementById('u-name').value = '';
+                document.getElementById('u-role').value = currentRoleTab; 
+                document.getElementById('u-pass').value = '';
+                
+                document.getElementById('u-role').dispatchEvent(new Event('change'));
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('user-modal').classList.add('hidden');
+        }
+
+        // 7. LƯU TÀI KHOẢN (Đã sửa để dùng saveToFirebase)
+        function saveUser() {
+            const id = document.getElementById('u-id').value;
+            const username = document.getElementById('u-username').value.trim();
+            const name = document.getElementById('u-name').value.trim();
+            const role = document.getElementById('u-role').value;
+            const pass = document.getElementById('u-pass').value.trim();
+            const school = document.getElementById('u-school').value;
+
+            if(!username || !name || !pass) return alert("Vui lòng nhập đầy đủ thông tin!");
+            
+            if (role === 'Teacher' && !school) {
+                return alert("⚠️ Vui lòng chọn Trường trực thuộc cho Giáo viên!");
+            }
+
+            if(id) {
+                const index = users.findIndex(u => u.id == id);
+                if(index > -1) {
+                    users[index].user = username;
+                    users[index].name = name;
+                    users[index].role = role;
+                    users[index].pass = pass;
+                    if(role === 'Teacher') users[index].school = school;
+                    else delete users[index].school;
+                }
+            } else {
+                const newUser = { id: Date.now(), user: username, name: name, role: role, pass: pass };
+                if(role === 'Teacher') newUser.school = school;
+                users.push(newUser);
+            }
+
+            // Gọi hàm lưu lên đám mây
+            saveToFirebase();
+            closeModal();
+            // Không cần gọi renderTable() vì Firebase sẽ tự động kích hoạt cập nhật lại bảng
+        }
+
+        // 8. SỬA TÀI KHOẢN
+        function editUser(id) {
+            const user = users.find(u => u.id === id);
+            if(user) {
+                document.getElementById('modal-title').innerText = "SỬA TÀI KHOẢN";
+                document.getElementById('u-id').value = user.id;
+                document.getElementById('u-username').value = user.user;
+                document.getElementById('u-name').value = user.name;
+                document.getElementById('u-role').value = user.role;
+                document.getElementById('u-pass').value = user.pass;
+                
+                openModal(true);
+                document.getElementById('u-role').dispatchEvent(new Event('change'));
+                
+                if(user.role === 'Teacher' && user.school) {
+                    setTimeout(() => { document.getElementById('u-school').value = user.school; }, 50);
+                }
+            }
+        }
+
+        // 9. XÓA TÀI KHOẢN (Đã sửa để dùng saveToFirebase)
+        function deleteUser(id) {
+            const user = users.find(u => u.id === id);
+            if(confirm(`Bạn có chắc chắn muốn xóa tài khoản: ${user.name} (${user.user}) không?`)) {
+                users = users.filter(u => u.id !== id);
+                saveToFirebase(); // Gọi lưu thay đổi lên mạng
+            }
+        }
+
+        // 10. ĐĂNG XUẤT
+        function logout() { 
+            localStorage.removeItem('userRole'); 
+            window.location.href = 'login.html'; 
+        }
+
+        // 11. KHỞI ĐỘNG (Lắng nghe dữ liệu trực tiếp từ Firebase)
+        window.onload = function() {
+            const tbody = document.getElementById('user-table');
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center p-8 text-indigo-500 font-bold animate-pulse">⏳ Đang đồng bộ dữ liệu với Đám mây...</td></tr>';
+            
+            // KẾT NỐI VÀ LẮNG NGHE DỮ LIỆU TỪ FIREBASE
+            db.ref('users').on('value', snapshot => {
+                const data = snapshot.val();
+                if(data) {
+                    // Chuyển dữ liệu từ object sang mảng và lọc các phần tử rỗng
+                    users = (Array.isArray(data) ? data : Object.values(data)).filter(u => u != null);
+                } else {
+                    users = []; 
+                }
+                // Tự động vẽ lại bảng mỗi khi Firebase có thay đổi
+                renderTable();
+            });
+        };
+    </script>
+</body>
+</html>

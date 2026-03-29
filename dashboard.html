@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HỆ THỐNG THI THÔNG MINH - Hệ Thống Quản Lý</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; overflow-x: hidden; }
+
+        .nav-link { 
+            @apply w-full text-left text-[14px] py-3 px-4 rounded-xl font-bold transition-all border-l-4 border-transparent text-slate-300 cursor-pointer flex items-center gap-3 my-1;
+        }
+        .nav-link:hover { @apply bg-slate-700 text-white; }
+        .nav-link.active { @apply bg-slate-700 text-white border-emerald-400 shadow-inner; }
+
+        #main-content { margin-left: 256px; min-height: 100vh; }
+
+        .clean-table { width: 100%; border-collapse: collapse; background: #ffffff; }
+        .clean-table th { @apply px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b-2 border-slate-200 text-left bg-slate-50; }
+        .clean-table td { @apply px-6 py-4 border-b border-slate-200 text-[14px] text-slate-800 font-medium transition-colors; }
+        .clean-table tr:hover td { background: #f8fafc; }
+
+        .stat-card { @apply p-6 rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow; }
+
+        .section-panel { display: none; }
+        .section-panel.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <aside class="w-64 bg-slate-800 text-white flex flex-col h-full shadow-2xl z-50 fixed left-0 top-0">
+        <div class="p-6 border-b border-slate-700 text-center">
+            <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg text-slate-800">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+            </div>
+            <h2 class="font-black text-lg text-white uppercase tracking-wider">HỆ THỐNG</h2>
+        </div>
+
+        <nav class="p-4 space-y-1 flex-1">
+            <div onclick="showSection('section-home')" class="nav-link active" id="btn-home">🏠 Tổng quan</div>
+            <div onclick="location.href='admin.html'" class="nav-link">📑 Quản trị kho đề</div>
+            <div onclick="location.href='teacher.html'" class="nav-link" id="btn-scores">📊 Chấm bài & Điểm thi</div>
+            <div onclick="showSection('section-classes')" class="nav-link" id="btn-classes">🏫 Quản lý lớp</div>
+        </nav>
+
+        <div class="p-4 border-t border-slate-700">
+            <button onclick="logout()" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-lg">🚪 Đăng xuất</button>
+        </div>
+    </aside>
+
+    <div id="main-content" class="flex-1 overflow-y-auto">
+        <header class="h-20 px-10 flex items-center justify-between sticky top-0 bg-white border-b border-slate-200 z-40">
+            <h1 id="page-title" class="text-xl font-bold text-slate-900">Tổng quan hệ thống</h1>
+            <div class="flex items-center gap-4">
+                <div class="text-right">
+                    <p id="display-name" class="text-[14px] font-bold text-slate-900 leading-none">...</p>
+                    <p id="display-school" class="text-[11px] text-indigo-600 mt-1 font-bold uppercase tracking-wide">...</p>
+                </div>
+                <div class="w-10 h-10 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center text-slate-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+            </div>
+        </header>
+
+        <main class="p-10 max-w-7xl mx-auto">
+            
+            <div id="section-home" class="section-panel active">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="stat-card">
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Đề thi đã tạo</p>
+                        <h3 id="stat-exams" class="text-4xl font-black text-slate-900 mt-3">0</h3>
+                    </div>
+                    <div class="stat-card border-indigo-200 bg-indigo-50">
+                        <p class="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Lớp quản lý</p>
+                        <h3 id="stat-classes" class="text-4xl font-black text-indigo-700 mt-3">0</h3>
+                    </div>
+                    <div class="stat-card">
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Sĩ số học sinh</p>
+                        <h3 id="stat-students" class="text-4xl font-black text-slate-900 mt-3">0</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div id="section-scores" class="section-panel">
+                <div class="border border-slate-200 rounded-2xl shadow-sm overflow-hidden bg-white">
+                    <table class="clean-table">
+                        <thead>
+                            <tr>
+                                <th>Học sinh</th>
+                                <th>Tên Đề thi</th>
+                                <th class="text-center">Điểm số</th>
+                                <th class="text-right">Thời gian nộp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="full-results-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="section-classes" class="section-panel">
+                <div id="class-main-view" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
+
+                <div id="class-detail-view" class="hidden">
+                    <div class="flex justify-between items-center mb-6 bg-white border border-slate-200 shadow-sm p-6 rounded-2xl">
+                        <div>
+                            <h2 id="detail-class-name" class="font-black text-slate-900 text-xl uppercase">...</h2>
+                            <p class="text-xs text-slate-500 font-medium mt-1">Quản lý tài khoản đăng nhập học sinh</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="exportClassToExcel()" class="px-5 py-2 bg-emerald-600 text-white rounded-xl text-[13px] font-bold hover:bg-emerald-700 shadow-sm transition-all">📥 Xuất Excel</button>
+                            <button onclick="closeClassDetail()" class="px-5 py-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-[13px] font-bold hover:bg-slate-200 transition-all">← Quay lại</button>
+                        </div>
+                    </div>
+                    <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+                        <table class="clean-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-16 text-center">STT</th>
+                                    <th>Họ và Tên</th>
+                                    <th>Tài khoản (ID)</th>
+                                    <th>Mật khẩu</th>
+                                    <th class="text-right">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="students-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // FIREBASE CONFIG 
+        const firebaseConfig = {
+            apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4",
+            authDomain: "chamcode-b55f7.firebaseapp.com",
+            databaseURL: "https://chamcode-b55f7-default-rtdb.firebaseio.com",
+            projectId: "chamcode-b55f7",
+            storageBucket: "chamcode-b55f7.firebasestorage.app",
+            messagingSenderId: "543967582205",
+            appId: "1:543967582205:web:9075e178c8df5a9c0f6b94"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // LẤY THÔNG TIN ĐĂNG NHẬP
+        const role = localStorage.getItem('userRole');
+        const userName = localStorage.getItem('currentUserName');
+        const schoolName = localStorage.getItem('schoolName') || "Demo School";
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.section-panel').forEach(s => s.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            
+            document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+            const btnMap = { 'section-home': 'btn-home', 'section-scores': 'btn-scores', 'section-classes': 'btn-classes' };
+            if(btnMap[sectionId]) document.getElementById(btnMap[sectionId]).classList.add('active');
+
+            const titles = { 'section-home': 'Tổng quan hệ thống', 'section-scores': 'Bảng điểm tổng hợp', 'section-classes': 'Quản lý lớp học' };
+            document.getElementById('page-title').innerText = titles[sectionId];
+            if(sectionId === 'section-classes') closeClassDetail();
+        }
+
+        window.onload = function() {
+            if (!role || !userName) { window.location.href = 'login.html'; return; }
+            document.getElementById('display-name').innerText = (role === 'admin' ? "Quản trị: " : "Giáo viên: ") + userName;
+            document.getElementById('display-school').innerText = schoolName;
+            loadDashboardData();
+        };
+
+        function loadDashboardData() {
+            let teacherClasses = new Set(); 
+            const isAdmin = (role && role.toLowerCase() === 'admin'); 
+
+            // 1. Thống kê & Lọc Đề thi
+            db.ref(`schools/${schoolName}/exams`).on('value', snap => {
+                let count = 0;
+                if (snap.exists()) {
+                    snap.forEach(child => {
+                        const exam = child.val();
+                        const isMyExam = isAdmin || exam.teacherName === userName || exam.createdBy === userName || !exam.teacherName;
+                        
+                        if (isMyExam) {
+                            count++;
+                            if (exam.classes && Array.isArray(exam.classes)) {
+                                exam.classes.forEach(cls => teacherClasses.add(cls));
+                            } else if (exam.class) {
+                                teacherClasses.add(exam.class);
+                            }
+                        }
+                    });
+                }
+                document.getElementById('stat-exams').innerText = count;
+                
+                // 2. Tải danh sách lớp
+                db.ref(`schools/${schoolName}/students`).on('value', sSnap => {
+                    const data = sSnap.val() || {};
+                    const allClassNames = Object.keys(data);
+                    
+                    let visibleClasses = allClassNames.filter(cls => isAdmin || teacherClasses.has(cls) || teacherClasses.size === 0);
+                    
+                    document.getElementById('stat-classes').innerText = visibleClasses.length;
+                    
+                    let cHtml = ""; let totalStudents = 0;
+                    
+                    visibleClasses.forEach(name => {
+                        const studentCount = Object.keys(data[name]).length;
+                        totalStudents += studentCount;
+                        cHtml += `
+                        <div onclick="viewClassDetails('${name}')" class="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm hover:border-indigo-500 hover:shadow-md transition-all cursor-pointer">
+                            <div class="text-3xl mb-3">🏫</div>
+                            <h4 class="font-black text-slate-900 text-[14px] uppercase">${name}</h4>
+                            <p class="text-[12px] text-slate-500 font-medium mt-1">Sĩ số: ${studentCount} học sinh</p>
+                            <p class="text-[11px] text-indigo-600 font-bold mt-2">XEM TÀI KHOẢN HỌC SINH →</p>
+                        </div>`;
+                    });
+                    
+                    if (visibleClasses.length === 0) cHtml = "<div class='col-span-4 text-center py-10 font-medium text-slate-500'>Chưa có dữ liệu lớp học phù hợp.</div>";
+                    document.getElementById('class-main-view').innerHTML = cHtml;
+                    document.getElementById('stat-students').innerText = totalStudents;
+                });
+            });
+
+            // 3. Tải Bảng điểm thi (ĐÃ SỬA CHUẨN ĐƯỜNG DẪN KHO ĐIỂM "results")
+            db.ref(`schools/${schoolName}/results`).on('value', snap => {
+                let html = "";
+                // Tải danh sách đề thi trước để lấy Tên Đề và check quyền
+                db.ref(`schools/${schoolName}/exams`).once('value', examSnap => {
+                    const myExams = {}; 
+                    if (examSnap.exists()) {
+                        examSnap.forEach(ex => {
+                            const val = ex.val();
+                            if (isAdmin || val.teacherName === userName || val.createdBy === userName || !val.teacherName) {
+                                myExams[ex.key] = val.name || "Đề không tên";
+                            }
+                        });
+                    }
+
+                    if (snap.exists()) {
+                        snap.forEach(examNode => {
+                            const examId = examNode.key;
+                            
+                            // Chỉ lấy điểm nếu đề thi đó thuộc về Giáo viên này
+                            if (myExams[examId]) {
+                                const studentsList = examNode.val();
+                                
+                                Object.keys(studentsList).forEach(studentKey => {
+                                    const r = studentsList[studentKey];
+                                    
+                                    const studentName = r.studentName || r.name || studentKey.replace(/_/g, ' ');
+                                    const examName = myExams[examId];
+                                    const score = r.totalScore !== undefined ? parseFloat(r.totalScore).toFixed(2) : parseFloat(r.score || 0).toFixed(2);
+                                    const time = r.time || r.timestamp || "Không rõ thời gian";
+
+                                    html = `
+                                    <tr>
+                                        <td>
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 bg-slate-100 border border-slate-200 rounded-lg text-xs flex items-center justify-center font-bold text-slate-600">${studentName.charAt(0).toUpperCase()}</div>
+                                                <span class="font-bold text-slate-900">${studentName}</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-slate-600 font-medium text-sm">${examName}</td>
+                                        <td class="text-center"><span class="px-4 py-1.5 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-full font-black text-[13px]">${score}</span></td>
+                                        <td class="text-right text-[12px] text-slate-500 font-semibold">${time}</td>
+                                    </tr>` + html;
+                                });
+                            }
+                        });
+                    }
+                    document.getElementById('full-results-table').innerHTML = html || "<tr><td colspan='4' class='text-center py-20 font-medium text-slate-500'>Chưa có học sinh nào nộp bài cho các đề của bạn.</td></tr>";
+                });
+            });
+        }
+
+        function exportClassToExcel() {
+            const className = document.getElementById('detail-class-name').innerText.replace('LỚP ', '');
+            const tbody = document.getElementById('students-table-body');
+            
+            if (!tbody || tbody.innerText.includes('Đang tải') || tbody.innerText.includes('chưa có học sinh')) {
+                alert("⚠️ Không có dữ liệu để xuất!"); return;
+            }
+
+            const data = [["STT", "Họ và Tên", "Tài khoản (ID)", "Mật khẩu", "Trạng thái"]];
+            const rows = tbody.querySelectorAll('tr');
+            
+            rows.forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 4) {
+                    data.push([
+                        cols[0].innerText, 
+                        cols[1].innerText, 
+                        cols[2].innerText, 
+                        cols[3].innerText, 
+                        cols[4] ? cols[4].innerText : 'Hoạt động'
+                    ]);
+                }
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, className);
+            XLSX.writeFile(wb, `Danh_Sach_Tai_Khoan_${className}.xlsx`);
+        }
+
+        function viewClassDetails(className) {
+            document.getElementById('class-main-view').classList.add('hidden');
+            document.getElementById('class-detail-view').classList.remove('hidden');
+            document.getElementById('detail-class-name').innerText = "LỚP " + className;
+            const tableBody = document.getElementById('students-table-body');
+            tableBody.innerHTML = "<tr><td colspan='5' class='text-center py-20 font-medium text-slate-500'>Đang tải danh sách học sinh...</td></tr>";
+
+            db.ref(`schools/${schoolName}/students/${className}`).once('value', snap => {
+                const students = snap.val();
+                if(!students) { 
+                    tableBody.innerHTML = "<tr><td colspan='5' class='text-center py-20 font-medium text-slate-500'>Lớp hiện tại chưa có học sinh nào.</td></tr>"; 
+                    return; 
+                }
+                
+                let html = ""; let index = 1;
+                Object.keys(students).forEach(id => {
+                    const s = students[id];
+                    const fullName = s.name || s.fullName || s.studentName || "Chưa cập nhật";
+                    const password = s.password || s.pass || "Chưa có pass";
+
+                    html += `
+                    <tr>
+                        <td class="text-center text-slate-500 font-bold">${index++}</td>
+                        <td class="font-bold text-slate-900">${fullName}</td>
+                        <td class="text-[14px] font-mono text-indigo-700 font-bold">${id}</td>
+                        <td class="text-[14px] font-mono text-slate-600 font-medium bg-slate-50 px-2 rounded">${password}</td>
+                        <td class="text-right"><span class="px-3 py-1 bg-green-100 text-green-700 border border-green-200 rounded-lg text-[11px] font-bold uppercase">Hoạt động</span></td>
+                    </tr>`;
+                });
+                tableBody.innerHTML = html;
+            });
+        }
+
+        function closeClassDetail() {
+            document.getElementById('class-main-view').classList.remove('hidden');
+            document.getElementById('class-detail-view').classList.add('hidden');
+        }
+
+        function logout() { if(confirm("Xác nhận đăng xuất khỏi hệ thống?")) { localStorage.clear(); window.location.href = 'login.html'; } }
+    </script>
+</body>
+</html>

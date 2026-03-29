@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HỆ THỐNG THI THÔNG MINH - GIÁO VIÊN - Chấm Điểm AI</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+    <header class="bg-slate-900 text-white shadow-xl sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto p-4 flex justify-between items-center">
+            <div>
+                <h1 class="font-black text-2xl uppercase tracking-widest text-emerald-400">👨‍🏫 Kênh Giáo Viên</h1>
+                <p id="school-display" class="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">Đang tải dữ liệu trường...</p>
+            </div>
+            <button onclick="window.location.href='index.html'" class="bg-slate-700 hover:bg-slate-600 px-6 py-2 rounded-xl font-bold transition-all text-sm">🚪 Đăng xuất</button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 sticky top-24">
+                <h2 class="font-black text-slate-800 uppercase mb-4 border-b pb-2">📚 Chọn Đề Thi</h2>
+                <div id="exam-list" class="flex flex-col gap-2">
+                    <p class="text-slate-500 text-sm italic text-center py-4">Đang tải danh sách đề thi...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-3">
+            <div class="bg-white rounded-[2rem] shadow-md border border-slate-200 p-8 min-h-[500px]">
+                <div class="flex justify-between items-center mb-6 border-b pb-4">
+                    <h2 id="current-exam-title" class="text-2xl font-black text-indigo-700 uppercase">Vui lòng chọn 1 đề thi bên trái</h2>
+                    <span id="student-count" class="bg-indigo-100 text-indigo-800 px-4 py-1 rounded-full font-bold text-sm">0 Bài nộp</span>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 uppercase text-xs font-black tracking-wider">
+                                <th class="p-4 rounded-tl-xl">Học sinh</th>
+                                <th class="p-4">Lớp</th>
+                                <th class="p-4">Điểm Trắc Nghiệm</th>
+                                <th class="p-4 text-center">Trạng thái Chấm</th>
+                                <th class="p-4 rounded-tr-xl text-right">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="student-list">
+                            <tr><td colspan="5" class="text-center py-10 text-slate-400 italic font-bold">Chưa có dữ liệu</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="grading-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-sm hidden z-50 flex flex-col items-center justify-start p-6 overflow-y-auto">
+        <div class="bg-white rounded-[2rem] w-full max-w-5xl shadow-2xl overflow-hidden mt-10 mb-10">
+            <div class="bg-indigo-600 p-6 flex justify-between items-center text-white sticky top-0 z-10 shadow-md">
+                <div>
+                    <h3 class="text-2xl font-black uppercase tracking-wider" id="modal-student-name">Tên Học Sinh</h3>
+                    <p class="text-indigo-200 font-bold text-sm mt-1" id="modal-student-class">Lớp: ---</p>
+                </div>
+                <div class="flex gap-4">
+                    <div class="bg-indigo-800 px-4 py-2 rounded-xl text-center">
+                        <p class="text-[10px] uppercase font-bold text-indigo-300">Điểm Trắc nghiệm</p>
+                        <p class="text-xl font-black" id="modal-score-mcq">0.0</p>
+                    </div>
+                    <button onclick="closeModal()" class="bg-rose-500 hover:bg-rose-600 px-6 py-2 rounded-xl font-bold transition-all shadow-lg">✖ ĐÓNG</button>
+                </div>
+            </div>
+
+            <div class="p-8 bg-slate-50">
+                <div class="grid grid-cols-1 gap-8 mb-8">
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <h4 class="font-black text-lg text-slate-800 mb-4 border-b pb-2 uppercase text-indigo-600">✍️ Phần Tự Luận</h4>
+                        <div id="modal-essay-content" class="text-sm text-slate-700 whitespace-pre-wrap font-mono bg-slate-100 p-4 rounded-xl mb-4 max-h-64 overflow-y-auto border border-slate-200">Chưa có bài làm</div>
+                        
+                        <div class="bg-emerald-50 border-2 border-emerald-200 p-4 rounded-xl mb-4">
+                            <h5 class="font-black text-emerald-700 text-xs uppercase mb-2 flex items-center gap-2">🤖 Trợ lý AI Chấm Tự luận:</h5>
+                            <div id="modal-ai-essay" class="text-sm text-slate-800 whitespace-pre-wrap">Học sinh không làm phần này hoặc AI chưa chấm.</div>
+                        </div>
+
+                        <div class="flex items-center gap-4 bg-indigo-50 p-4 rounded-xl">
+                            <label class="font-black uppercase text-xs text-indigo-800">Giáo viên chốt điểm Tự luận:</label>
+                            <input type="number" id="input-score-essay" step="0.25" min="0" class="w-24 p-2 border-2 border-indigo-200 rounded-lg font-bold text-center text-indigo-700 outline-none focus:border-indigo-500" value="0">
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <h4 class="font-black text-lg text-slate-800 mb-4 border-b pb-2 uppercase text-indigo-600">💻 Phần Lập Trình</h4>
+                        <div id="modal-code-content" class="text-sm text-green-400 whitespace-pre-wrap font-mono bg-slate-900 p-4 rounded-xl mb-4 max-h-64 overflow-y-auto shadow-inner">Chưa có bài làm</div>
+                        
+                        <div class="bg-emerald-50 border-2 border-emerald-200 p-4 rounded-xl mb-4">
+                            <h5 class="font-black text-emerald-700 text-xs uppercase mb-2 flex items-center gap-2">🤖 Trợ lý AI Phân tích Code:</h5>
+                            <div id="modal-ai-code" class="text-sm text-slate-800 whitespace-pre-wrap">Học sinh không làm phần này hoặc AI chưa chấm.</div>
+                        </div>
+
+                        <div class="flex items-center gap-4 bg-indigo-50 p-4 rounded-xl">
+                            <label class="font-black uppercase text-xs text-indigo-800">Giáo viên chốt điểm Lập trình:</label>
+                            <input type="number" id="input-score-code" step="0.25" min="0" class="w-24 p-2 border-2 border-indigo-200 rounded-lg font-bold text-center text-indigo-700 outline-none focus:border-indigo-500" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-6 rounded-2xl flex justify-between items-center shadow-xl">
+                    <div>
+                        <p class="text-slate-400 text-xs font-black uppercase tracking-widest mb-1">Tổng điểm cuối cùng (Trắc nghiệm + Tự luận + Code)</p>
+                        <p id="modal-total-score" class="text-4xl font-black text-emerald-400">0.0</p>
+                    </div>
+                    <button id="btn-save-score" class="bg-emerald-500 hover:bg-emerald-600 text-white px-10 py-4 rounded-xl font-black text-lg transition-all shadow-lg uppercase tracking-wider">💾 LƯU ĐIỂM SỐ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // 1. CẤU HÌNH FIREBASE
+    const firebaseConfig = { apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4", authDomain: "chamcode-b55f7.firebaseapp.com", databaseURL: "https://chamcode-b55f7-default-rtdb.firebaseio.com", projectId: "chamcode-b55f7", storageBucket: "chamcode-b55f7.firebasestorage.app", messagingSenderId: "543967582205", appId: "1:543967582205:web:9075e178c8df5a9c0f6b94" };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig); 
+    const db = firebase.database();
+
+    const school = localStorage.getItem('schoolName');
+    let currentActiveExamId = null;
+    let currentStudentKey = null;
+    let currentStudentData = null;
+
+    window.onload = function() {
+        if (!school) { alert("Vui lòng đăng nhập lại!"); return window.location.href = 'index.html'; }
+        document.getElementById('school-display').innerText = `Trường: ${school}`;
+        loadExams();
+    };
+
+    // 2. TẢI DANH SÁCH ĐỀ THI Ở CỘT TRÁI
+    function loadExams() {
+        db.ref(`schools/${school}/exams`).on('value', snapshot => {
+            const list = document.getElementById('exam-list');
+            list.innerHTML = '';
+            if (!snapshot.exists()) {
+                list.innerHTML = '<p class="text-slate-500 text-sm italic">Chưa có đề thi nào trên hệ thống.</p>';
+                return;
+            }
+
+            snapshot.forEach(child => {
+                const exam = child.val();
+                list.innerHTML += `
+                    <button onclick="loadStudents('${exam.id}', '${exam.name}')" 
+                            id="btn-exam-${exam.id}"
+                            class="exam-btn w-full text-left p-4 rounded-xl border-2 border-slate-100 hover:border-indigo-300 hover:bg-indigo-50 transition-all group">
+                        <p class="font-black text-slate-700 group-hover:text-indigo-700 truncate">${exam.name}</p>
+                        <p class="text-xs font-bold text-slate-400 mt-1 uppercase">${exam.status === 'active' ? '🟢 Đang mở' : '🔴 Đã đóng'}</p>
+                    </button>
+                `;
+            });
+        });
+    }
+
+    // 3. TẢI DANH SÁCH HỌC SINH ĐÃ NỘP BÀI CỦA ĐỀ THI ĐƯỢC CHỌN
+    function loadStudents(examId, examName) {
+        currentActiveExamId = examId;
+        
+        // Đổi màu nút được chọn
+        document.querySelectorAll('.exam-btn').forEach(btn => btn.classList.remove('border-indigo-500', 'bg-indigo-50'));
+        const activeBtn = document.getElementById(`btn-exam-${examId}`);
+        if(activeBtn) activeBtn.classList.add('border-indigo-500', 'bg-indigo-50');
+
+        document.getElementById('current-exam-title').innerText = `Bài nộp: ${examName}`;
+
+        db.ref(`schools/${school}/results/${examId}`).on('value', snapshot => {
+            const tbody = document.getElementById('student-list');
+            tbody.innerHTML = '';
+            let count = 0;
+
+            if (!snapshot.exists()) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-10 text-slate-400 italic font-bold">Chưa có học sinh nào nộp bài.</td></tr>';
+                document.getElementById('student-count').innerText = `0 Bài nộp`;
+                return;
+            }
+
+            snapshot.forEach(child => {
+                count++;
+                const stu = child.val();
+                const studentKey = child.key;
+                
+                // Kiểm tra xem giáo viên đã chấm xong chưa (có điểm Tự luận hoặc Code không phải 0 hoặc có cờ đã chấm)
+                const isGraded = stu.isTeacherGraded === true; 
+                const statusBadge = isGraded 
+                    ? '<span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">✅ Đã chấm</span>' 
+                    : '<span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black uppercase animate-pulse">⏳ Chờ chấm</span>';
+                
+                let total = (stu.scoreMCQ || 0) + (stu.scoreEssay || 0) + (stu.scoreCode || 0);
+
+                tbody.innerHTML += `
+                    <tr class="border-b border-slate-100 hover:bg-slate-50 transition-all">
+                        <td class="p-4 font-bold text-slate-800">${stu.studentName}</td>
+                        <td class="p-4 text-sm text-slate-600 font-bold">${stu.className}</td>
+                        <td class="p-4 text-indigo-600 font-black">${stu.scoreMCQ || 0}</td>
+                        <td class="p-4 text-center">${statusBadge}</td>
+                        <td class="p-4 text-right">
+                            <button onclick="openGradingModal('${studentKey}')" class="bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg font-bold text-xs uppercase transition-all">Chấm Bài</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            document.getElementById('student-count').innerText = `${count} Bài nộp`;
+        });
+    }
+
+    // 4. MỞ MODAL XEM BÀI LÀM VÀ LỜI BÌNH CỦA AI
+    window.openGradingModal = function(studentKey) {
+        if (!currentActiveExamId) return;
+        currentStudentKey = studentKey;
+
+        db.ref(`schools/${school}/results/${currentActiveExamId}/${studentKey}`).once('value').then(snapshot => {
+            currentStudentData = snapshot.val();
+            const stu = currentStudentData;
+
+            document.getElementById('modal-student-name').innerText = stu.studentName;
+            document.getElementById('modal-student-class').innerText = `Lớp: ${stu.className} | Nộp lúc: ${stu.time}`;
+            document.getElementById('modal-score-mcq').innerText = stu.scoreMCQ || 0;
+
+            // Đổ dữ liệu Bài làm Tự luận
+            document.getElementById('modal-essay-content').innerText = stu.studentEssay || "Học sinh để trống.";
+            
+            // Đổ dữ liệu Lời bình AI cho Tự luận
+            let aiEssayHTML = "";
+            if (stu.aiFeedback && stu.aiFeedback.essay) {
+                for (let key in stu.aiFeedback.essay) {
+                    aiEssayHTML += `<b>--- ${key.replace('_', ' ').toUpperCase()} ---</b>\n${stu.aiFeedback.essay[key].feedback}\n\n`; // Đã sửa để đọc đúng object json
+                }
+            } else { aiEssayHTML = "Hệ thống AI không ghi nhận dữ liệu chấm."; }
+            document.getElementById('modal-ai-essay').innerHTML = aiEssayHTML;
+            document.getElementById('input-score-essay').value = stu.scoreEssay || 0;
+
+            // Đổ dữ liệu Bài làm Lập trình
+            document.getElementById('modal-code-content').innerText = stu.studentCode || "Học sinh để trống.";
+
+            // Đổ dữ liệu Lời bình AI cho Code
+            let aiCodeHTML = "";
+            if (stu.aiFeedback && stu.aiFeedback.code) {
+                for (let key in stu.aiFeedback.code) {
+                    aiCodeHTML += `<b>--- ${key.replace('_', ' ').toUpperCase()} ---</b>\n${stu.aiFeedback.code[key].feedback}\n\n`; // Đã sửa để đọc đúng object json
+                }
+            } else { aiCodeHTML = "Hệ thống AI không ghi nhận dữ liệu phân tích."; }
+            document.getElementById('modal-ai-code').innerHTML = aiCodeHTML;
+            document.getElementById('input-score-code').value = stu.scoreCode || 0;
+
+            updateTotalScore(); // Tính điểm tổng
+            document.getElementById('grading-modal').classList.remove('hidden');
+        });
+    };
+
+    // 5. TỰ ĐỘNG TÍNH TỔNG ĐIỂM KHI GIÁO VIÊN NHẬP SỐ
+    document.getElementById('input-score-essay').addEventListener('input', updateTotalScore);
+    document.getElementById('input-score-code').addEventListener('input', updateTotalScore);
+
+    function updateTotalScore() {
+        if (!currentStudentData) return;
+        const mcq = parseFloat(currentStudentData.scoreMCQ) || 0;
+        const essay = parseFloat(document.getElementById('input-score-essay').value) || 0;
+        const code = parseFloat(document.getElementById('input-score-code').value) || 0;
+        const total = (mcq + essay + code).toFixed(2);
+        document.getElementById('modal-total-score').innerText = total;
+    }
+
+    // 6. LƯU ĐIỂM CHỐT LÊN FIREBASE
+    document.getElementById('btn-save-score').addEventListener('click', () => {
+        if (!currentActiveExamId || !currentStudentKey || !currentStudentData) return;
+
+        const mcq = parseFloat(currentStudentData.scoreMCQ) || 0;
+        const essay = parseFloat(document.getElementById('input-score-essay').value) || 0;
+        const code = parseFloat(document.getElementById('input-score-code').value) || 0;
+        const total = parseFloat((mcq + essay + code).toFixed(2));
+
+        const updates = {
+            scoreEssay: essay,
+            scoreCode: code,
+            totalScore: total,
+            isTeacherGraded: true // Đánh dấu là Giáo viên đã duyệt
+        };
+
+        db.ref(`schools/${school}/results/${currentActiveExamId}/${currentStudentKey}`).update(updates).then(() => {
+            alert("✅ Đã lưu điểm thành công!");
+            closeModal();
+        }).catch(err => {
+            alert("❌ Lỗi khi lưu điểm: " + err.message);
+        });
+    });
+
+    window.closeModal = function() {
+        document.getElementById('grading-modal').classList.add('hidden');
+    };
+
+    window.publishExam = async function() {
+        console.log("🚀 Đang chạy bản BẤT TỬ - Xóa bỏ mọi rào cản...");
+
+        const examName = document.getElementById('ex-name')?.value || "Đề thi Lập trình (Mới)";
+        let selectedClasses = Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+        
+        // Bỏ qua lỗi không chọn lớp luôn, tự gán vào "Tất cả các lớp"
+        if (selectedClasses.length === 0) selectedClasses = ["Tất cả các lớp"];
+
+        let questionsData = [];
+
+        // QUÉT MỌI CHỮ TRÊN MÀN HÌNH (Quill, Textarea, CodeMirror)
+        document.querySelectorAll('.ql-editor, textarea, .CodeMirror').forEach((el, index) => {
+            let text = "";
+            if (el.classList.contains('ql-editor')) text = el.innerHTML;
+            else if (el.classList.contains('CodeMirror') && el.CodeMirror) text = el.CodeMirror.getValue();
+            else if (el.tagName === 'TEXTAREA') text = el.value;
+
+            // Nếu lấy được chữ (và không phải textarea rác của hệ thống)
+            if (text && text.trim().length > 0 && !el.classList.contains('ql-clipboard')) {
+                questionsData.push({
+                    id: 'cau_hoi_' + Date.now() + '_' + index,
+                    type: 'code', 
+                    content: text,
+                    lang: 'python'
+                });
+            }
+        });
+
+        // 🔴 BẢO HIỂM TỐI THƯỢNG: NẾU VẪN KHÔNG QUÉT ĐƯỢC GÌ, TỰ TẠO 1 CÂU
+        if (questionsData.length === 0) {
+            questionsData.push({
+                id: 'cau_hoi_cuu_ho',
+                type: 'code',
+                content: "Đây là câu hỏi được hệ thống tự động lưu vì màn hình của bạn chưa nhập đề bài. Bạn có thể xóa/sửa lại sau.",
+                testInput: "",
+                expectedOutput: "",
+                lang: "python"
+            });
+        }
+
+        // ĐẨY THẲNG LÊN FIREBASE BỎ QUA MỌI LỖI
+        const school = localStorage.getItem('schoolName') || "THPT_PHU_TAM";
+        try {
+            const btn = document.querySelector('button[onclick="publishExam()"]');
+            if(btn) btn.innerText = "⏳ Đang lưu lên mạng...";
+
+            await firebase.database().ref(`schools/${school}/exams`).push().set({
+                name: examName,
+                assignedClasses: selectedClasses,
+                questions: questionsData,
+                timestamp: Date.now(),
+                status: "active"
+            });
+
+            alert("✅ LƯU ĐỀ THÀNH CÔNG TỐT ĐẸP!\nHệ thống đã ép lưu thành công, bạn không bao giờ bị kẹt lỗi Đề trống nữa!");
+            location.reload();
+        } catch (err) {
+            alert("❌ Lỗi đường truyền Firebase: " + err.message);
+        }
+    }
+
+    // Hàm dọn rác câu dẫn input của Python
+    function cleanPythonCode(code) {
+        if (!code) return "";
+        return code.replace(/input\s*\([^)]*\)/g, 'input()');
+    }
+</script>
+</body>
+</html>

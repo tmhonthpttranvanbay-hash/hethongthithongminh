@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>HỆ THỐNG THI THÔNG MINH - ĐĂNG NHẬP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); font-family: 'Segoe UI', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+    </style>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body class="flex items-center justify-center h-screen relative overflow-hidden">
+    
+    <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+
+    <div class="glass p-8 rounded-3xl shadow-2xl w-full max-w-md transform transition-all relative z-10">
+        
+        <div id="role-screen">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-black text-slate-800 uppercase tracking-wider">CHỌN VAI TRÒ</h1>
+                <p class="text-slate-500 text-sm mt-2">Vui lòng chọn đối tượng đăng nhập</p>
+            </div>
+            <div class="space-y-4">
+                <button onclick="showLogin('admin')" class="w-full flex items-center p-4 bg-red-50 hover:bg-red-100 border-2 border-red-200 rounded-2xl transition-all group">
+                    <span class="text-3xl mr-4">👑</span>
+                    <div class="text-left"><h3 class="font-black text-red-700">QUẢN TRỊ</h3></div>
+                </button>
+                <button onclick="showLogin('teacher')" class="w-full flex items-center p-4 bg-indigo-50 hover:bg-indigo-100 border-2 border-indigo-200 rounded-2xl transition-all group">
+                    <span class="text-3xl mr-4">👨‍🏫</span>
+                    <div class="text-left"><h3 class="font-black text-indigo-700">GIÁO VIÊN</h3></div>
+                </button>
+                <button onclick="showLogin('student')" class="w-full flex items-center p-4 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 rounded-2xl transition-all group">
+                    <span class="text-3xl mr-4">🎓</span>
+                    <div class="text-left"><h3 class="font-black text-emerald-700">HỌC SINH</h3></div>
+                </button>
+            </div>
+        </div>
+
+        <div id="login-screen" class="hidden">
+            <button onclick="location.reload()" class="text-sm font-bold text-slate-400 hover:text-indigo-600 mb-4 flex items-center">← Quay lại</button>
+            <div class="text-center mb-6"><h1 id="login-title" class="text-xl font-black text-slate-800 uppercase">ĐĂNG NHẬP</h1></div>
+
+            <div class="space-y-4">
+                <div id="school-box">
+                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase">Trường học</label>
+                    <select id="school" class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold bg-slate-50 text-slate-700"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase">Tài khoản</label>
+                    <input type="text" id="username" class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold" placeholder="...">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 mb-1 uppercase">Mật khẩu</label>
+                    <input type="password" id="password" class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold" placeholder="••••••••">
+                </div>
+                <button id="btnSubmit" onclick="doLogin()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-indigo-700 transition-all">ĐĂNG NHẬP NGAY</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CẤU HÌNH FIREBASE
+        const config = {
+            apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4",
+            authDomain: "chamcode-b55f7.firebaseapp.com",
+            databaseURL: "https://chamcode-b55f7-default-rtdb.firebaseio.com",
+            projectId: "chamcode-b55f7",
+            storageBucket: "chamcode-b55f7.firebasestorage.app",
+            messagingSenderId: "543967582205",
+            appId: "1:543967582205:web:9075e178c8df5a9c0f6b94"
+        };
+        if (!firebase.apps.length) {
+            firebase.initializeApp(config);
+        }
+        const db = firebase.database(); 
+    </script>
+
+    <script>
+        let roleMode = '';
+
+        function showLogin(role) {
+            roleMode = role;
+            document.getElementById('role-screen').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+            
+            const schoolBox = document.getElementById('school-box');
+            const schoolSelect = document.getElementById('school');
+            const title = document.getElementById('login-title');
+
+            if (role === 'admin') {
+                schoolBox.classList.add('hidden');
+                title.innerText = "QUẢN TRỊ";
+            } else {
+                schoolBox.classList.remove('hidden');
+                title.innerText = (role === 'teacher') ? "GIÁO VIÊN ĐĂNG NHẬP" : "HỌC SINH ĐĂNG NHẬP";
+                
+                // 1. TẠO HIỆU ỨNG ĐANG TẢI TRƯỜNG TỪ FIREBASE
+                schoolSelect.innerHTML = '<option value="">⏳ Đang tải danh sách trường từ Hệ thống...</option>';
+                schoolSelect.disabled = true;
+
+                // 2. KẾT NỐI FIREBASE LẤY DANH SÁCH TRƯỜNG
+                db.ref('users').once('value').then(snapshot => {
+                    schoolSelect.innerHTML = '<option value="">-- Chọn trường --</option>';
+                    schoolSelect.disabled = false;
+                    
+                    const usersData = snapshot.val();
+                    let hasSchool = false;
+
+                    if (usersData) {
+                        // Duyệt qua tất cả user trên Firebase
+                        Object.keys(usersData).forEach(userId => {
+                            const u = usersData[userId];
+                            if (u.role === 'School Admin') {
+                                schoolSelect.innerHTML += `<option value="${u.name}">${u.name}</option>`;
+                                hasSchool = true;
+                            }
+                        });
+                    }
+
+                    // Nếu trên mạng chưa có trường nào
+                    if (!hasSchool) {
+                        schoolSelect.innerHTML += '<option value="THPT Trần Văn Bảy">THPT Trần Văn Bảy (Mặc định)</option>';
+                    }
+                }).catch(error => {
+                    schoolSelect.innerHTML = '<option value="">❌ Lỗi kết nối mạng!</option>';
+                    console.error("Lỗi lấy danh sách trường:", error);
+                });
+            }
+        }
+
+        async function doLogin() {
+            const u = document.getElementById('username').value.trim();
+            const p = document.getElementById('password').value.trim();
+            const s = document.getElementById('school').value;
+            const btn = document.getElementById('btnSubmit');
+
+            if (!u || !p) return alert("Vui lòng nhập đầy đủ thông tin!");
+
+            // --- LUỒNG 1: ADMIN ---
+            if (roleMode === 'admin') {
+                if (u === 'admin' && p === 'admintvb@2026') {
+                    localStorage.setItem('userRole', 'superadmin');
+                    window.location.href = 'superadmin.html';
+                } else { alert("Sai thông tin Admin!"); }
+                return;
+            }
+
+            if (!s) return alert("Vui lòng chọn trường học!");
+
+            // --- LUỒNG 2: GIÁO VIÊN ---
+            if (roleMode === 'teacher') {
+                btn.innerText = "ĐANG KIỂM TRA ĐÁM MÂY...";
+                btn.disabled = true;
+
+                // Lấy danh sách giáo viên từ Firebase
+                db.ref('users').once('value').then(snapshot => {
+                    const usersData = snapshot.val();
+                    let found = null;
+
+                    if (usersData) {
+                        const usersArray = Object.values(usersData);
+                        found = usersArray.find(x => x.user === u && x.pass === p);
+                    }
+
+                    if (found) {
+                        localStorage.setItem('userRole', found.role.toLowerCase());
+                        localStorage.setItem('schoolName', s); 
+                        localStorage.setItem('currentUserName', found.name);
+                        window.location.href = 'dashboard.html'; // Giáo viên vào dashboard
+                    } else { 
+                        alert("❌ Sai tài khoản hoặc mật khẩu giáo viên!"); 
+                    }
+                }).catch(e => {
+                    alert("Lỗi kết nối Firebase: " + e.message);
+                }).finally(() => {
+                    btn.innerText = "ĐĂNG NHẬP NGAY";
+                    btn.disabled = false;
+                });
+                return;
+            }
+
+            // --- LUỒNG 3: HỌC SINH ---
+            if (roleMode === 'student') {
+                btn.innerText = "ĐANG KIỂM TRA...";
+                btn.disabled = true;
+
+                db.ref('students/' + u).once('value').then(snapshot => {
+                    const data = snapshot.val();
+                    if (snapshot.exists() && data.password === p) {
+                        localStorage.setItem('userRole', 'student');
+                        localStorage.setItem('schoolName', s);
+                        localStorage.setItem('currentUserName', data.fullName);
+                        localStorage.setItem('currentClass', data.className);
+                        // ĐÃ SỬA DÒNG NÀY: Đổi từ index.html sang student.html
+                        window.location.href = 'student.html'; 
+                    } else {
+                        alert("❌ Sai tài khoản hoặc mật khẩu học sinh!");
+                    }
+                }).catch(e => {
+                    alert("Lỗi kết nối Firebase: " + e.message);
+                }).finally(() => {
+                    btn.innerText = "ĐĂNG NHẬP NGAY";
+                    btn.disabled = false;
+                });
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bộ Soạn Thảo Tự Luận Hoàn Chỉnh</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #f0fdf4; /* Màu nền xanh nhạt giống ảnh */
+            padding: 20px;
+        }
+
+        .editor-section {
+            max-width: 900px;
+            margin: 0 auto 20px auto;
+            background: #fff;
+            border: 1px solid #22c55e;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .section-title {
+            color: #16a34a;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .box-container {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        /* Thanh công cụ Toán học */
+        .toolbar-header {
+            background-color: #f8fafc;
+            padding: 10px 15px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #4338ca;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .math-toolbar {
+            padding: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #fff;
+        }
+
+        .math-btn {
+            background: #fff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 5px 8px;
+            font-size: 13px;
+            color: #334155;
+            cursor: pointer;
+            transition: 0.2s;
+            min-width: 32px;
+        }
+
+        .math-btn:hover { background: #e0e7ff; border-color: #818cf8; color: #3730a3; }
+
+        /* Thanh định dạng chữ */
+        .text-toolbar {
+            padding: 8px 15px;
+            display: flex;
+            gap: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .text-btn {
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            font-weight: bold;
+            color: #475569;
+        }
+        .text-btn:hover { background: #e2e8f0; border-color: #cbd5e1; }
+
+        /* Ô nhập liệu */
+        .editor-textarea {
+            width: 100%;
+            border: none;
+            padding: 15px;
+            font-size: 15px;
+            min-height: 120px;
+            resize: vertical;
+            box-sizing: border-box;
+            outline: none;
+            line-height: 1.6;
+            color: #1e293b;
+        }
+        
+        .editor-textarea:focus { background-color: #fefce8; } /* Đổi màu nhẹ khi đang gõ */
+    </style>
+</head>
+<body>
+
+    <div class="editor-section">
+        <div class="section-title">
+            <span>✍️ CÂU TỰ LUẬN 1</span>
+        </div>
+
+        <div class="box-container">
+            <div class="toolbar-header">📚 BỘ CÔNG CỤ TOÁN / LÝ / HÓA TOÀN DIỆN:</div>
+            
+            <div class="math-toolbar">
+                <button class="math-btn" data-latex="\frac{a}{b}">a/b</button>
+                <button class="math-btn" data-latex="\sqrt{x}">√x</button>
+                <button class="math-btn" data-latex="x^2">x²</button>
+                <button class="math-btn" data-latex="\log_{a}(b)">log</button>
+                <button class="math-btn" data-latex="\lim_{x \to \infty}">lim</button>
+                <button class="math-btn" data-latex="\int_{a}^{b}">∫</button>
+                <button class="math-btn" data-latex="\sum_{i=1}^{n}">Σ</button>
+                <button class="math-btn" data-latex="\pi">π</button>
+                <button class="math-btn" data-latex="\Delta">△</button>
+                <button class="math-btn" data-latex="\begin{cases} x+y=0 \\ x-y=0 \end{cases}">{ Hệ PT }</button>
+                <button class="math-btn" data-latex="\begin{bmatrix} a & b \\ c & d \end{bmatrix}">[ Ma Trận ]</button>
+                </div>
+
+            <div class="text-toolbar">
+                <button class="text-btn" data-tag="b" title="In đậm">B</button>
+                <button class="text-btn" data-tag="i" title="In nghiêng" style="font-style: italic;">I</button>
+                <button class="text-btn" data-tag="u" title="Gạch chân" style="text-decoration: underline;">U</button>
+            </div>
+
+            <textarea class="editor-textarea" placeholder="Nhập đề bài tự luận..."></textarea>
+        </div>
+
+        <div class="box-container">
+            <div class="toolbar-header">🎯 ĐÁP ÁN & HƯỚNG DẪN CHẤM (Barem):</div>
+            
+            <div class="math-toolbar">
+                <button class="math-btn" data-latex="\frac{a}{b}">a/b</button>
+                <button class="math-btn" data-latex="\sqrt{x}">√x</button>
+                <button class="math-btn" data-latex="x^2">x²</button>
+                <button class="math-btn" data-latex="\Rightarrow">⇒</button>
+                <button class="math-btn" data-latex="\Leftrightarrow">⇔</button>
+            </div>
+
+            <div class="text-toolbar">
+                <button class="text-btn" data-tag="b">B</button>
+                <button class="text-btn" data-tag="i" style="font-style: italic;">I</button>
+                <button class="text-btn" data-tag="u" style="text-decoration: underline;">U</button>
+            </div>
+
+            <textarea class="editor-textarea" placeholder="Nhập đáp án và barem điểm..."></textarea>
+        </div>
+    </div>
+
+    <script>
+        // Biến lưu trữ ô textarea đang được người dùng click vào
+        let activeTextarea = null;
+
+        // Lắng nghe sự kiện click/focus vào bất kỳ textarea nào để biết đang gõ ở đâu
+        document.querySelectorAll('.editor-textarea').forEach(textarea => {
+            textarea.addEventListener('focus', function() {
+                activeTextarea = this;
+            });
+            textarea.addEventListener('click', function() {
+                activeTextarea = this;
+            });
+        });
+
+        // Hàm xử lý chèn text tại vị trí con trỏ
+        function insertTextAtCursor(textToInsert, wrapFormat = false) {
+            if (!activeTextarea) {
+                alert("Vui lòng click chuột vào ô nhập liệu trước khi chọn công cụ!");
+                return;
+            }
+
+            const startPos = activeTextarea.selectionStart;
+            const endPos = activeTextarea.selectionEnd;
+            const textBefore = activeTextarea.value.substring(0, startPos);
+            const textSelected = activeTextarea.value.substring(startPos, endPos);
+            const textAfter = activeTextarea.value.substring(endPos, activeTextarea.value.length);
+
+            if (wrapFormat) {
+                // Xử lý định dạng chữ (B, I, U) -> bọc chữ đang bôi đen lại
+                const openTag = `<${textToInsert}>`;
+                const closeTag = `</${textToInsert}>`;
+                activeTextarea.value = textBefore + openTag + textSelected + closeTag + textAfter;
+                activeTextarea.focus();
+                activeTextarea.selectionStart = startPos + openTag.length;
+                activeTextarea.selectionEnd = startPos + openTag.length + textSelected.length;
+            } else {
+                // Xử lý chèn Toán học (LaTeX)
+                const mathCode = "$" + textToInsert + "$";
+                activeTextarea.value = textBefore + mathCode + textAfter;
+                activeTextarea.focus();
+                activeTextarea.selectionStart = startPos + mathCode.length;
+                activeTextarea.selectionEnd = startPos + mathCode.length;
+            }
+        }
+
+        // Bắt sự kiện cho các nút Toán học (LaTeX)
+        document.querySelectorAll('.math-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault(); // Ngăn trình duyệt tự cuộn
+                const latexCode = button.getAttribute('data-latex');
+                insertTextAtCursor(latexCode, false);
+            });
+        });
+
+        // Bắt sự kiện cho các nút định dạng chữ (B, I, U)
+        document.querySelectorAll('.text-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tag = button.getAttribute('data-tag');
+                insertTextAtCursor(tag, true);
+            });
+        });
+    </script>
+    
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Biến lưu trữ ô nhập liệu cuối cùng mà người dùng click vào
+    let lastActiveInput = null;
+
+    // 2. Tìm tất cả các ô nhập liệu (cả textarea của tự luận và input của trắc nghiệm)
+    // Bạn có thể đổi selector này cho khớp với class trong hệ thống của bạn nếu cần
+    const allInputFields = document.querySelectorAll('textarea, input[type="text"]');
+    
+    // Lắng nghe để biết người dùng đang gõ ở ô nào
+    allInputFields.forEach(input => {
+        input.addEventListener('focus', function() {
+            lastActiveInput = this;
+        });
+        input.addEventListener('click', function() {
+            lastActiveInput = this;
+        });
+    });
+
+    // 3. Hàm xử lý chèn công thức Toán
+    function insertMathCode(latexString) {
+        if (!lastActiveInput) {
+            alert("Vui lòng click chuột vào một ô (Câu hỏi/Đáp án) trước khi bấm chọn công cụ!");
+            return;
+        }
+
+        // Lấy vị trí con trỏ chuột hiện tại
+        const startPos = lastActiveInput.selectionStart;
+        const endPos = lastActiveInput.selectionEnd;
+        const textBefore = lastActiveInput.value.substring(0, startPos);
+        const textAfter = lastActiveInput.value.substring(endPos, lastActiveInput.value.length);
+
+        // Bọc công thức trong dấu $ $ để thư viện toán học nhận diện
+        const mathCode = "$" + latexString + "$";
+
+        // Chèn vào đúng chỗ
+        lastActiveInput.value = textBefore + mathCode + textAfter;
+
+        // Đưa con trỏ chuột ra ngay sau công thức vừa chèn để gõ tiếp
+        lastActiveInput.focus();
+        lastActiveInput.selectionStart = startPos + mathCode.length;
+        lastActiveInput.selectionEnd = startPos + mathCode.length;
+        
+        // (Quan trọng) Báo cho hệ thống biết ô text vừa thay đổi nội dung để lưu lại
+        lastActiveInput.dispatchEvent(new Event('input', { bubbles: true }));
+        lastActiveInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // 4. Gắn sự kiện cho tất cả các nút công cụ Toán/Lý/Hóa
+    // Lưu ý: Đảm bảo các nút của bạn có class="math-btn" và thuộc tính data-latex="..."
+    const mathButtons = document.querySelectorAll('.math-btn');
+    mathButtons.forEach(btn => {
+        // Dùng 'mousedown' thay vì 'click' để tránh việc ô nhập liệu bị mất focus khi bấm nút
+        btn.addEventListener('mousedown', function(e) {
+            e.preventDefault(); 
+            const latexCode = this.getAttribute('data-latex');
+            if (latexCode) {
+                insertMathCode(latexCode);
+            }
+        });
+    });
+});
+</script>
+
+
+
+
+</body>
+</html>

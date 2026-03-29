@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <script>
+    // Kiểm tra xem người dùng đã đăng nhập chưa (ví dụ bạn lưu tên hoặc tài khoản trong localStorage)
+    // Giả sử bạn lưu biến 'currentUser' hoặc 'schoolName' khi đăng nhập thành công
+    if (!localStorage.getItem('schoolName') && !localStorage.getItem('currentUser')) {
+        // Nếu chưa có dữ liệu đăng nhập -> Đá văng ra trang login.html ngay lập tức
+        window.location.href = "login.html";
+    }
+</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>HỆ THỐNG THI THÔNG MINH - HỌC SINH - DANH SÁCH ĐÈ THI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800">
+
+    <header class="bg-indigo-600 text-white p-4 shadow-md flex justify-between items-center">
+        <h1 class="text-lg font-black tracking-wide">📚 CỔNG HỌC SINH</h1>
+        <div class="text-right">
+            <div id="student-info" class="text-sm font-bold text-yellow-300">Đang tải...</div>
+            <button onclick="logout()" class="text-[11px] underline hover:text-indigo-200">Đăng xuất</button>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto mt-8 p-4">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-black text-slate-700 border-l-4 border-indigo-500 pl-3">ĐỀ THI CỦA TÔI</h2>
+            <button onclick="loadMyExams()" class="bg-white px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-600 border border-indigo-200 shadow-sm hover:bg-indigo-50 transition-all active:scale-95">
+                🔄 Tải lại dữ liệu gốc
+            </button>
+        </div>
+
+        <div id="student-exam-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="col-span-full text-center py-10 text-slate-400 italic font-bold">
+                ⏳ Đang quét tìm đề thi phù hợp...
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 1. CẤU HÌNH FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4",
+            authDomain: "chamcode-b55f7.firebaseapp.com",
+            databaseURL: "https://chamcode-b55f7-default-rtdb.firebaseio.com",
+            projectId: "chamcode-b55f7",
+            storageBucket: "chamcode-b55f7.firebasestorage.app",
+            messagingSenderId: "543967582205",
+            appId: "1:543967582205:web:9075e178c8df5a9c0f6b94"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        // 2. LẤY THÔNG TIN ĐĂNG NHẬP
+        const schoolName = localStorage.getItem('schoolName');
+        const myName = localStorage.getItem('currentUserName');
+        const myClass = localStorage.getItem('currentClass') || localStorage.getItem('studentClass');
+
+        // 3. KHỞI CHẠY KHI MỞ TRANG
+        window.onload = function() {
+            if (!schoolName || !myName || !myClass) {
+                alert("Nháy OK!");
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            const studentInfo = document.getElementById('student-info');
+            if(studentInfo) studentInfo.innerText = `${myName} (Lớp ${myClass})`;
+
+            loadMyExams();
+        };
+
+        // 4. THUẬT TOÁN TẢI DỮ LIỆU ĐỘC LẬP (Sạch bóng Cache)
+        function loadMyExams() {
+            const container = document.getElementById('student-exam-list');
+            if (!container) return; 
+
+            container.innerHTML = '<div class="text-center py-10 font-bold text-indigo-500 animate-pulse col-span-full">⏳ Đang kết nối trực tiếp với Firebase...</div>';
+
+            const studentKey = myName.replace(/\s/g, '_');
+            
+            let completedExams = {};
+            let isResultsLoaded = false;
+
+            // BƯỚC A: Quét bảng điểm độc lập
+            db.ref(`schools/${schoolName}/results`).once('value', resultSnapshot => {
+                if (resultSnapshot.exists()) {
+                    resultSnapshot.forEach(examResults => {
+                        const examId = examResults.key;
+                        if (examResults.hasChild(studentKey)) {
+                            completedExams[examId] = true; 
+                        }
+                    });
+                }
+                isResultsLoaded = true;
+                renderExams(); // Kích hoạt render khi có điểm
+            });
+
+            // BƯỚC B: Quét kho đề độc lập
+            let examSnapshotData = null;
+            db.ref(`schools/${schoolName}/exams`).on('value', snapshot => {
+                examSnapshotData = snapshot;
+                if (isResultsLoaded) renderExams(); // Kích hoạt render khi có đề
+            }, error => {
+                container.innerHTML = `<div class="p-10 text-center text-red-500 font-bold bg-red-50 rounded-xl col-span-full">❌ Lỗi mạng: ${error.message}</div>`;
+            });
+
+            // HÀM RENDER CHÍNH
+            function renderExams() {
+                if (!examSnapshotData) return; // Đợi tải xong đề
+
+                container.innerHTML = ''; 
+
+                // Nếu kho đề trên Firebase TRỐNG TRƠN
+                if (!examSnapshotData.exists()) {
+                    container.innerHTML = '<div class="p-10 text-center text-slate-500 font-bold bg-white rounded-xl col-span-full border-2 border-dashed shadow-sm">🎉 Lớp của bạn hiện không có bài kiểm tra nào đang mở!</div>';
+                    return;
+                }
+
+                let hasExam = false;
+
+                examSnapshotData.forEach(child => {
+                    const exam = child.val();
+                    const isActive = exam.status === "active";
+                    
+                    let isForMyClass = false;
+                    if (!exam.classes) {
+                        isForMyClass = true; 
+                    } else {
+                        const studentClassClean = String(myClass).trim().toLowerCase(); 
+                        const assignedClassesString = JSON.stringify(exam.classes).toLowerCase();
+                        
+                        if (assignedClassesString.includes(studentClassClean) || 
+                            assignedClassesString.includes("tất cả") || 
+                            assignedClassesString.includes("all")) {
+                            isForMyClass = true;
+                        }
+                    }
+
+                    if (isActive && isForMyClass) {
+                        hasExam = true;
+                        const isCompleted = completedExams[exam.id];
+                        
+                        let buttonHTML = '';
+                        let cardClass = '';
+
+                        if (isCompleted) {
+                            cardClass = 'bg-slate-50 border-slate-200 opacity-75';
+                            buttonHTML = `
+                                <button disabled class="bg-slate-200 text-slate-500 font-bold py-3 px-4 rounded-xl w-full cursor-not-allowed border border-slate-300">
+                                    ✅ ĐÃ THI XONG
+                                </button>
+                            `;
+                        } else {
+                            cardClass = 'bg-white border-indigo-100 hover:border-indigo-500 hover:shadow-md cursor-pointer';
+                            buttonHTML = `
+                                <button onclick="vaoThi('${exam.id}')" class="bg-indigo-50 text-indigo-600 font-bold py-3 px-4 rounded-xl w-full hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                                    🚀 VÀO THI NGAY
+                                </button>
+                            `;
+                        }
+
+                        container.innerHTML += `
+                            <div class="p-6 rounded-2xl shadow-sm border-2 transition-all flex flex-col justify-between ${cardClass}">
+                                <div>
+                                    <h3 class="font-black text-xl mb-2 ${isCompleted ? 'text-slate-500' : 'text-indigo-800'}">${exam.name}</h3>
+                                    <p class="text-sm font-bold mb-1 ${isCompleted ? 'text-slate-400' : 'text-slate-500'}">Môn: <span class="${isCompleted ? 'text-slate-500' : 'text-indigo-600'}">${exam.subject || 'Chung'}</span></p>
+                                    <p class="text-sm font-bold mb-4 ${isCompleted ? 'text-slate-400' : 'text-slate-500'}">⏱ Thời gian: <span class="${isCompleted ? 'text-slate-500' : 'text-red-500'}">${exam.timeLimit || 'Không giới hạn'} phút</span></p>
+                                </div>
+                                ${buttonHTML}
+                            </div>
+                        `;
+                    }
+                });
+
+                // Nếu có đề nhưng không dành cho lớp này
+                if (!hasExam) {
+                    container.innerHTML = '<div class="p-10 text-center text-slate-500 font-bold bg-white rounded-xl col-span-full border-2 border-dashed shadow-sm">🎉 Lớp của bạn hiện không có bài kiểm tra nào đang mở!</div>';
+                }
+            }
+        }
+
+        // 5. HÀM VÀO THI
+        function vaoThi(examId) {
+            localStorage.setItem('activeExamId', examId);
+            window.location.href = 'student.html';
+        }
+
+        // 6. HÀM ĐĂNG XUẤT
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
