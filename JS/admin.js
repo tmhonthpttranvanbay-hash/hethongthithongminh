@@ -731,3 +731,54 @@ document.addEventListener('click', function(e) {
         }).catch(err => alert("Lỗi: " + err.message));
     }
 }, true);
+
+// =========================================================
+// CHỨC NĂNG XEM CHI TIẾT BÀI LÀM
+// =========================================================
+
+// 1. Hàm đóng Modal
+function dongModalChiTiet() {
+    document.getElementById('modal-chitiet-bailam').classList.add('hidden');
+}
+
+// 2. Hàm mở Modal và lấy thông tin
+function moModalXemBai(nutBam) {
+    // Tìm thẻ <tr> (hàng) chứa cái nút vừa bấm
+    const hang = nutBam.closest('tr');
+    if (!hang) return;
+
+    // Lấy thông tin từ các cột trong hàng đó (td)
+    const cacCot = hang.querySelectorAll('td');
+    
+    // Giả sử cột 1 là Mã HS, Cột 2 là Tên, Cột 3 là Lớp, Cột 4 là Điểm...
+    // (Bạn có thể điều chỉnh [số] cho đúng với thứ tự cột thực tế trên web của bạn)
+    const tenHocSinh = cacCot[1] ? cacCot[1].innerText : "Học sinh ẩn danh";
+    const lopHoc = cacCot[2] ? cacCot[2].innerText : "...";
+    const diemSo = cacCot[3] ? cacCot[3].innerText : "0";
+
+    // Mở Bảng lên
+    const modal = document.getElementById('modal-chitiet-bailam');
+    const noiDung = document.getElementById('noidung-chitiet-bailam');
+    modal.classList.remove('hidden');
+
+    // Tạo nội dung hiển thị
+    noiDung.innerHTML = `
+        <div class="bg-white p-5 rounded-lg border border-indigo-100 shadow-sm mb-4">
+            <h4 class="text-2xl font-bold text-indigo-800 mb-1">${tenHocSinh}</h4>
+            <div class="flex gap-4 text-gray-600 text-sm">
+                <p><i class="fas fa-users mr-1"></i> Lớp: <strong>${lopHoc}</strong></p>
+                <p><i class="fas fa-clock mr-1"></i> Trạng thái: <strong>Đã nộp bài</strong></p>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <p class="text-gray-500">Điểm số đạt được:</p>
+                <p class="text-4xl font-black text-red-500">${diemSo}</p>
+            </div>
+        </div>
+        
+        <div class="bg-blue-50 text-blue-800 p-4 rounded-lg border border-blue-200 text-sm">
+            <p><i class="fas fa-info-circle mr-2"></i> <strong>Ghi chú:</strong> Hiện tại hệ thống đang lấy thông tin cơ bản. Để xem chi tiết từng câu trả lời trắc nghiệm hoặc bài code, bạn cần kết nối thêm ID bài làm này với cơ sở dữ liệu Firebase.</p>
+        </div>
+    `;
+}
+
+
