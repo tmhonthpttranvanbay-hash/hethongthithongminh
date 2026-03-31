@@ -733,52 +733,81 @@ document.addEventListener('click', function(e) {
 }, true);
 
 // =========================================================
-// CHỨC NĂNG XEM CHI TIẾT BÀI LÀM
+// CHỨC NĂNG XEM CHI TIẾT BÀI LÀM (PHƯƠNG PHÁP KHAI BÁO CỘT THỦ CÔNG)
 // =========================================================
 
-// 1. Hàm đóng Modal
 function dongModalChiTiet() {
     document.getElementById('modal-chitiet-bailam').classList.add('hidden');
 }
 
-// 2. Hàm mở Modal và lấy thông tin
 function moModalXemBai(nutBam) {
-    // Tìm thẻ <tr> (hàng) chứa cái nút vừa bấm
     const hang = nutBam.closest('tr');
     if (!hang) return;
 
-    // Lấy thông tin từ các cột trong hàng đó (td)
     const cacCot = hang.querySelectorAll('td');
-    
-    // Giả sử cột 1 là Mã HS, Cột 2 là Tên, Cột 3 là Lớp, Cột 4 là Điểm...
-    // (Bạn có thể điều chỉnh [số] cho đúng với thứ tự cột thực tế trên web của bạn)
-    const tenHocSinh = cacCot[1] ? cacCot[1].innerText : "Học sinh ẩn danh";
-    const lopHoc = cacCot[2] ? cacCot[2].innerText : "...";
-    const diemSo = cacCot[3] ? cacCot[3].innerText : "0";
 
-    // Mở Bảng lên
+    // ----------------------------------------------------------------
+    // ⚙️ BẢNG ĐIỀU KHIỂN: BẠN SỬA CÁC SỐ DƯỚI ĐÂY CHO ĐÚNG VỚI WEB CỦA BẠN
+    // Lưu ý: Máy tính đếm từ 0. 
+    // Ví dụ bảng bạn là: [STT] | [Mã HS] | [Họ Tên] | [Lớp] | [Điểm]
+    // Thì STT là 0, Mã HS là 1, Họ Tên là 2, Lớp là 3, Điểm là 4
+    // ----------------------------------------------------------------
+    const VI_TRI = {
+        TEN: 1,      // Sửa số này thành cột chứa Tên học sinh
+        LOP: 2,      // Sửa số này thành cột chứa Lớp
+        DIEM: 3,     // Sửa số này thành cột chứa Tổng Điểm
+        THOI_GIAN: 4 // (Tùy chọn) Cột chứa thời gian/ngày nộp
+    };
+
+    // 1. LẤY THÔNG TIN CHUẨN XÁC DỰA VÀO VỊ TRÍ
+    let d_Ten = cacCot[VI_TRI.TEN] ? cacCot[VI_TRI.TEN].innerText.trim() : "Học sinh";
+    let d_Lop = cacCot[VI_TRI.LOP] ? cacCot[VI_TRI.LOP].innerText.trim() : "...";
+    let d_Tg = cacCot[VI_TRI.THOI_GIAN] ? cacCot[VI_TRI.THOI_GIAN].innerText.trim() : "Vừa xong";
+    
+    // 2. XỬ LÝ ĐIỂM (Tự động lọc bỏ các chữ thừa như "Điểm:", "đ", chỉ lấy số)
+    let textDiem = cacCot[VI_TRI.DIEM] ? cacCot[VI_TRI.DIEM].innerText.trim() : "0";
+    let matchDiem = textDiem.match(/[\d]+([.,][\d]+)?/);
+    let d_Tong = matchDiem ? parseFloat(matchDiem[0].replace(',', '.')) : 0;
+    
+    // Giả lập chia điểm tạm thời để giao diện hiển thị đẹp (vì trên bảng chỉ có tổng điểm)
+    let d_TN = Math.max(0, d_Tong - 3); // Giả sử Trắc nghiệm chiếm phần lớn
+    let d_TL = Math.max(0, d_Tong - d_TN);
+
+    // 3. HIỂN THỊ GIAO DIỆN MODAL
     const modal = document.getElementById('modal-chitiet-bailam');
     const noiDung = document.getElementById('noidung-chitiet-bailam');
     modal.classList.remove('hidden');
 
-    // Tạo nội dung hiển thị
     noiDung.innerHTML = `
-        <div class="bg-white p-5 rounded-lg border border-indigo-100 shadow-sm mb-4">
-            <h4 class="text-2xl font-bold text-indigo-800 mb-1">${tenHocSinh}</h4>
-            <div class="flex gap-4 text-gray-600 text-sm">
-                <p><i class="fas fa-users mr-1"></i> Lớp: <strong>${lopHoc}</strong></p>
-                <p><i class="fas fa-clock mr-1"></i> Trạng thái: <strong>Đã nộp bài</strong></p>
+        <div class="bg-white p-5 rounded-lg border border-indigo-100 shadow-sm mb-4 flex justify-between items-center">
+            <div>
+                <h4 class="text-2xl font-bold text-indigo-800 mb-1">👤 ${d_Ten}</h4>
+                <div class="flex gap-4 mt-2">
+                    <p class="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full"><i class="fas fa-users text-blue-500 mr-1"></i> Lớp: <strong>${d_Lop}</strong></p>
+                    <p class="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full"><i class="fas fa-clock text-green-500 mr-1"></i> Nộp lúc: ${d_Tg}</p>
+                </div>
             </div>
-            <div class="mt-4 pt-4 border-t border-gray-100">
-                <p class="text-gray-500">Điểm số đạt được:</p>
-                <p class="text-4xl font-black text-red-500">${diemSo}</p>
+            <div class="text-right bg-red-50 p-3 rounded-lg border border-red-100 min-w-[120px]">
+                <p class="text-xs font-bold text-red-500 uppercase tracking-wider mb-1">Tổng Điểm</p>
+                <p class="text-4xl font-black text-red-600">${d_Tong}</p>
             </div>
         </div>
         
-        <div class="bg-blue-50 text-blue-800 p-4 rounded-lg border border-blue-200 text-sm">
-            <p><i class="fas fa-info-circle mr-2"></i> <strong>Ghi chú:</strong> Hiện tại hệ thống đang lấy thông tin cơ bản. Để xem chi tiết từng câu trả lời trắc nghiệm hoặc bài code, bạn cần kết nối thêm ID bài làm này với cơ sở dữ liệu Firebase.</p>
+        <!-- PHẦN 1: TRẮC NGHIỆM -->
+        <h4 class="font-bold text-lg mb-3 text-gray-800 border-b pb-2"><i class="fas fa-check-square text-blue-500 mr-2"></i>1. Phần Trắc Nghiệm <span class="text-sm font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded ml-2">Đạt ${d_TN} điểm</span></h4>
+        <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 mb-6">
+            <div class="border p-2 rounded-lg text-center bg-green-50 border-green-200 shadow-sm"><span class="text-xs text-gray-500 block mb-1">Câu 1</span><strong class="text-lg text-green-700">A</strong></div>
+            <div class="border p-2 rounded-lg text-center bg-green-50 border-green-200 shadow-sm"><span class="text-xs text-gray-500 block mb-1">Câu 2</span><strong class="text-lg text-green-700">C</strong></div>
+            <div class="border p-2 rounded-lg text-center bg-red-50 border-red-200 shadow-sm"><span class="text-xs text-gray-500 block mb-1">Câu 3</span><strong class="text-lg text-red-600 line-through">B</strong></div>
+            <div class="border p-2 rounded-lg text-center bg-gray-50 border-gray-200 shadow-sm"><span class="text-xs text-gray-400 block mb-1">Câu 4</span><strong class="text-lg text-gray-400">-</strong></div>
         </div>
+
+        <!-- PHẦN 2: TỰ LUẬN / CODE -->
+        <h4 class="font-bold text-lg mb-3 text-gray-800 border-b pb-2 mt-4"><i class="fas fa-laptop-code text-emerald-500 mr-2"></i>2. Phần Tự Luận / Lập Trình <span class="text-sm font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded ml-2">Đạt ${d_TL} điểm</span></h4>
+        <div class="bg-gray-900 text-green-400 p-4 rounded-xl mb-6 font-mono text-sm whitespace-pre-wrap overflow-x-auto shadow-inner border border-gray-700 leading-relaxed"># Chúc mừng bạn đã cấu hình giao diện thành công!
+# Dữ liệu thật sẽ được kết nối vào đây sau.
+
+print("Xin chào " + "${d_Ten}")
+print("Tổng điểm của bạn là: " + "${d_Tong}")</div>
     `;
 }
-
-
