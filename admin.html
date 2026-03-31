@@ -1141,74 +1141,81 @@ function clearAllExamsEverywhere() {
     });
 
     // 3. Hàm bấm nút "Tải Dữ Liệu" để xem điểm
-    function loadStatistics() {
-        const schoolName = localStorage.getItem('schoolName') || "Truong_Demo";
-        const classVal = document.getElementById('stat-class').value;
-        const examId = document.getElementById('stat-exam').value;
-        const tbody = document.getElementById('stat-table-body');
+    // 3. Hàm bấm nút "Tải Dữ Liệu" để xem điểm
+function loadStatistics() {
+    const schoolName = localStorage.getItem('schoolName') || "Truong_Demo";
+    const classVal = document.getElementById('stat-class').value;
+    const examId = document.getElementById('stat-exam').value;
+    const tbody = document.getElementById('stat-table-body');
 
-        if (!examId) {
-            alert("⚠️ Vui lòng chọn Đề thi trước khi tải dữ liệu!");
+    if (!examId) {
+        alert("⚠️ Vui lòng chọn Đề thi trước khi tải dữ liệu!");
+        return;
+    }
+
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-indigo-500 font-bold animate-pulse">⏳ Đang kết nối kho điểm Firebase...</td></tr>';
+
+    // 🌟 THÊM MỚI: TẠO KHO LƯU TRỮ TẠM THỜI ĐỂ CẤT BÀI LÀM
+    window.khoDuLieuBaiLam = {};
+
+    const db = firebase.database();
+    
+    // Quét vào kho điểm của đúng cái đề thi đó
+    db.ref(`schools/${schoolName}/results/${examId}`).once('value', snap => {
+        tbody.innerHTML = '';
+        
+        if (!snap.exists()) {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-bold bg-slate-50">chưa có học sinh nào nộp bài thi này!</td></tr>';
             return;
         }
 
-        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-indigo-500 font-bold animate-pulse">⏳ Đang kết nối kho điểm Firebase...</td></tr>';
-
-        const db = firebase.database();
+        let hasData = false;
         
-        // Quét vào kho điểm của đúng cái đề thi đó
-        db.ref(`schools/${schoolName}/results/${examId}`).once('value', snap => {
-            tbody.innerHTML = '';
+        snap.forEach(child => {
+            const studentKey = child.key; 
+            const result = child.val();
             
-            if (!snap.exists()) {
-                tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-bold bg-slate-50">chưa có học sinh nào nộp bài thi này!</td></tr>';
-                return;
+            const studentClass = result.className || result.class || result.studentClass || "Không rõ";
+            const studentName = result.studentName || result.name || studentKey.replace(/_/g, ' ');
+            
+            // Lọc theo lớp (Nếu giáo viên chọn 1 lớp cụ thể)
+            if (classVal && classVal !== "all" && studentClass !== classVal) {
+                return; 
             }
 
-            let hasData = false;
+            hasData = true;
+
+            // 🌟 THÊM MỚI: CẤT TOÀN BỘ BÀI LÀM VÀO KHO (DÙNG studentKey LÀM CHÌA KHÓA)
+            window.khoDuLieuBaiLam[studentKey] = result;
             
-            snap.forEach(child => {
-                const studentKey = child.key; 
-                const result = child.val();
-                
-                const studentClass = result.className || result.class || result.studentClass || "Không rõ";
-                const studentName = result.studentName || result.name || studentKey.replace(/_/g, ' ');
-                
-                // Lọc theo lớp (Nếu giáo viên chọn 1 lớp cụ thể)
-                if (classVal && classVal !== "all" && studentClass !== classVal) {
-                    return; 
-                }
+            // Lấy điểm
+            const scoreMCQ = parseFloat(result.scoreMCQ || 0).toFixed(2);
+            const scoreEssay = parseFloat(result.scoreEssay || 0).toFixed(2);
+            const scoreCode = parseFloat(result.scoreCode || 0).toFixed(2);
+            const totalScore = parseFloat(result.totalScore || 0).toFixed(2);
 
-                hasData = true;
-                
-                // Lấy điểm
-                const scoreMCQ = parseFloat(result.scoreMCQ || 0).toFixed(2);
-                const scoreEssay = parseFloat(result.scoreEssay || 0).toFixed(2);
-                const scoreCode = parseFloat(result.scoreCode || 0).toFixed(2);
-                const totalScore = parseFloat(result.totalScore || 0).toFixed(2);
-
-                // In ra bảng
-                tbody.innerHTML += `
-                    <tr class="border-b hover:bg-indigo-50 transition-colors">
-                        <td class="p-3 border text-sm font-black text-slate-700">
-                            ${studentName} <br><span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Lớp: ${studentClass}</span>
-                        </td>
-                        <td class="p-3 border text-center font-bold text-blue-600">${scoreMCQ}</td>
-                        <td class="p-3 border text-center font-bold text-emerald-600">${scoreEssay}</td>
-                        <td class="p-3 border text-center font-bold text-yellow-600">${scoreCode}</td>
-                        <td class="p-3 border text-center font-black text-red-600 text-lg bg-red-50">${totalScore}</td>
-                        <td class="p-3 border text-center">
-    <button onclick="moModalXemBai(this)" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">Xem bài</button>
-</td>
-                    </tr>
-                `;
-            });
-
-            if (!hasData) {
-                tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-bold bg-slate-50">Lớp này chưa có ai nộp bài.</td></tr>';
-            }
+            // In ra bảng
+            tbody.innerHTML += `
+               <tr class="border-b hover:bg-indigo-50 transition-colors">
+                    <td class="p-3 border text-sm font-black text-slate-700">
+                        ${studentName} <br><span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Lớp: ${studentClass}</span>
+                    </td>
+                    <td class="p-3 border text-center font-bold text-blue-600">${scoreMCQ}</td>
+                    <td class="p-3 border text-center font-bold text-emerald-600">${scoreEssay}</td>
+                    <td class="p-3 border text-center font-bold text-yellow-600">${scoreCode}</td>
+                    <td class="p-3 border text-center font-black text-red-600 text-lg bg-red-50">${totalScore}</td>
+                    <td class="p-3 border text-center">
+                        <button onclick="moModalXemBai(this, '${studentKey}')" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">Xem bài</button>
+                    </td>
+                </tr>
+            `;
         });
-    }
+
+        if (!hasData) {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500 font-bold bg-slate-50">Lớp này chưa có ai nộp bài.</td></tr>';
+        }
+    });
+}
 </script>
 
 <script>
@@ -2043,6 +2050,114 @@ function cleanPythonCode(code) {
             </div>
         </div>
     </div>
+
+
+
+<script>
+    function dongModalChiTiet() {
+        document.getElementById('modal-chitiet-bailam').classList.add('hidden');
+    }
+
+    function moModalXemBai(nutBam, studentKey) {
+        // 1. LẤY ĐIỂM TỪ GIAO DIỆN BẢNG
+        const hang = nutBam.closest('tr');
+        if (!hang) return;
+        const cacCot = hang.querySelectorAll('td');
+
+        let tenHocSinh = cacCot[0].childNodes[0] ? cacCot[0].childNodes[0].textContent.trim() : "Học sinh";
+        let theSpanLop = cacCot[0].querySelector('span');
+        let lopHoc = theSpanLop ? theSpanLop.textContent.replace('Lớp:', '').trim() : "";
+
+        let diemTracNghiem = cacCot[1] ? cacCot[1].innerText.trim() : "0";
+        let diemTuLuan = cacCot[2] ? cacCot[2].innerText.trim() : "0";
+        let diemLapTrinh = cacCot[3] ? cacCot[3].innerText.trim() : "0";
+        let tongDiem = cacCot[4] ? cacCot[4].innerText.trim() : "0";
+
+        // 2. VÀO KHO LẤY BÀI LÀM VÀ LỜI NHẬN XÉT CỦA AI
+        let chiTiet = window.khoDuLieuBaiLam ? window.khoDuLieuBaiLam[studentKey] : null;
+        
+        let txtTracNghiem = "// Chưa có nội dung";
+        let txtTuLuan = "// Chưa có nội dung";
+        let txtLapTrinh = "// Chưa có nội dung";
+
+        // Cập nhật lại TÊN BIẾN chuẩn xác theo file student.html của bạn
+        if (chiTiet) {
+            // Lấy nội dung học sinh viết
+            let dataTN = chiTiet.studentAnswers || chiTiet.answers;
+            let dataTL = chiTiet.studentEssay || chiTiet.essay;
+            let dataLT = chiTiet.studentCode || chiTiet.code;
+
+            // Đóng gói thành chuỗi văn bản
+            txtTracNghiem = typeof dataTN === 'object' ? JSON.stringify(dataTN, null, 2) : dataTN;
+            txtTuLuan = typeof dataTL === 'object' ? JSON.stringify(dataTL, null, 2) : dataTL;
+            txtLapTrinh = typeof dataLT === 'object' ? JSON.stringify(dataLT, null, 2) : dataLT;
+
+            // NẾU CÓ NHẬN XÉT CỦA AI, GHÉP VÀO PHÍA DƯỚI BÀI LÀM
+            if (chiTiet.aiFeedback) {
+                if (chiTiet.aiFeedback.essay && Object.keys(chiTiet.aiFeedback.essay).length > 0) {
+                    txtTuLuan += "\n\n" + "=".repeat(40) + "\n🤖 AI NHẬN XÉT & CHẤM ĐIỂM BAREM:\n" + "=".repeat(40) + "\n";
+                    for (let key in chiTiet.aiFeedback.essay) {
+                        let f = chiTiet.aiFeedback.essay[key];
+                        txtTuLuan += `\n[${key.toUpperCase()}] - ${f.score} Điểm\n${f.feedback}\n`;
+                    }
+                }
+                
+                if (chiTiet.aiFeedback.code && Object.keys(chiTiet.aiFeedback.code).length > 0) {
+                    txtLapTrinh += "\n\n" + "/".repeat(40) + "\n// 🤖 AI PHÂN TÍCH THUẬT TOÁN:\n" + "/".repeat(40) + "\n";
+                    for (let key in chiTiet.aiFeedback.code) {
+                        let f = chiTiet.aiFeedback.code[key];
+                        txtLapTrinh += `\n// [${key.toUpperCase()}] - ${f.score} Điểm\n/*\n${f.feedback}\n*/\n`;
+                    }
+                }
+            }
+        }
+
+        // 3. HIỂN THỊ LÊN GIAO DIỆN ADMIN
+        const modal = document.getElementById('modal-chitiet-bailam');
+        const noiDung = document.getElementById('noidung-chitiet-bailam');
+        modal.classList.remove('hidden');
+
+        noiDung.innerHTML = `
+            <div class="bg-white p-5 rounded-xl border border-indigo-100 shadow-sm mb-6 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h4 class="text-2xl font-bold text-indigo-800 mb-1">👤 ${tenHocSinh}</h4>
+                    <span class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border">Lớp: ${lopHoc}</span>
+                </div>
+                <div class="flex gap-2 text-center">
+                    <div class="bg-blue-50 border border-blue-100 p-2 md:p-3 rounded-lg min-w-[70px]">
+                        <p class="text-[10px] uppercase font-bold text-blue-400">Trắc nghiệm</p>
+                        <p class="text-xl md:text-2xl font-black text-blue-600">${diemTracNghiem}</p>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-100 p-2 md:p-3 rounded-lg min-w-[70px]">
+                        <p class="text-[10px] uppercase font-bold text-emerald-400">Tự luận</p>
+                        <p class="text-xl md:text-2xl font-black text-emerald-600">${diemTuLuan}</p>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-100 p-2 md:p-3 rounded-lg min-w-[70px]">
+                        <p class="text-[10px] uppercase font-bold text-yellow-500">Lập trình</p>
+                        <p class="text-xl md:text-2xl font-black text-yellow-600">${diemLapTrinh}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-sm">
+                    <h4 class="font-bold text-lg text-blue-700 mb-3 border-b pb-2"><i class="fas fa-check-circle mr-2"></i> Đáp Án Trắc Nghiệm</h4>
+                    <pre class="text-sm text-gray-700 bg-blue-50 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono border border-blue-100">${txtTracNghiem || "Không có dữ liệu trắc nghiệm"}</pre>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-green-100 shadow-sm">
+                    <h4 class="font-bold text-lg text-green-700 mb-3 border-b pb-2"><i class="fas fa-pen-fancy mr-2"></i> Bài Làm Tự Luận</h4>
+                    <div class="text-sm text-gray-800 bg-green-50 p-3 rounded-lg border border-green-100 whitespace-pre-line leading-relaxed">${txtTuLuan || "Không có dữ liệu tự luận"}</div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-purple-100 shadow-sm">
+                    <h4 class="font-bold text-lg text-purple-700 mb-3 border-b pb-2"><i class="fas fa-laptop-code mr-2"></i> Source Code & Chấm Code</h4>
+                    <pre class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto border border-gray-700 leading-relaxed shadow-inner">${txtLapTrinh || "Không có dữ liệu code"}</pre>
+                </div>
+            </div>
+        `;
+    }
+</script>
+
+
 
 </body>
 </html>
