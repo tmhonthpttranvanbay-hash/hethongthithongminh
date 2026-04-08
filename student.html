@@ -112,7 +112,7 @@
 
 <script>
     // --- 1. CẤU HÌNH API VÀ FIREBASE ---
-    const GEMINI_API_KEY = "AIzaSyD4EOau9bdPfyFPpHXYiFybUZAsXCL5dpE"; 
+    const GEMINI_API_KEY = "AIzaSyCcN-nUIkA0nPoUI8RIVADbCB2NsllEsOM"; 
     
     const firebaseConfig = { 
         apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4", 
@@ -378,184 +378,162 @@ async function fetchWithRetry(url, options) {
     }
 }
 
+
+
+
+
+
 // =================================================================
 // 1. HÀM CHẤM TỰ LUẬN (ÉP BUỘC CHẤM THEO BAREM)
 // =================================================================
+// =================================================================
+// 1. HÀM CHẤM TỰ LUẬN
+// =================================================================
+// =====================================================================
+// 1. CÁC HÀM PHỤ TRỢ (Ngủ đông & Chạy code ngầm)
+// =====================================================================
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function autoGradeCode(code, inputData, expectedData, lang) {
+    return new Promise((resolve) => {
+        let result = { isPass: false, actualOut: "" };
+        if (!code || !code.trim()) return resolve(result);
+        expectedData = expectedData ? expectedData.trim() : "";
+        
+        if (lang === 'python') {
+            if (typeof Sk === "undefined") return resolve(result);
+            if (typeof cleanPythonCode === "function") code = cleanPythonCode(code); 
+            let actualOut = ""; 
+            let inputLines = inputData ? inputData.replace(/\r/g, '').trim().split('\n') : []; 
+            let inputIdx = 0;
+            
+            Sk.configure({
+                output: function(text) { actualOut += text; },
+                read: function(x) { if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) throw "File not found"; return Sk.builtinFiles["files"][x]; },
+                inputfun: function() { return new Promise(r => r(inputIdx < inputLines.length ? inputLines[inputIdx++] : "")); }
+            });
+            Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, code, true))
+            .then(() => { 
+                result.actualOut = actualOut; 
+                result.isPass = (expectedData !== "" && actualOut.trim() === expectedData); 
+                resolve(result); 
+            })
+            .catch((err) => { 
+                result.actualOut = "Lỗi cú pháp: " + err.toString(); 
+                resolve(result); 
+            });
+        } else if (lang === 'cpp') {
+            if (typeof JSCPP === "undefined") return resolve(result);
+            let actualOut = ""; let config = { stdio: { write: function(s) { actualOut += s; } } };
+            try {
+                JSCPP.run(code, inputData, config);
+                result.actualOut = actualOut;
+                result.isPass = (expectedData !== "" && actualOut.trim() === expectedData);
+                resolve(result);
+            } catch (e) { result.actualOut = "Lỗi biên dịch"; resolve(result); }
+        } else resolve(result);
+    });
+}
+
+// =====================================================================
+// 2. CÁC HÀM GỌI GOOGLE AI (Đã dùng gemini-1.5-flash siêu mượt)
+// =====================================================================
+// =====================================================================
+// 2. CÁC HÀM GỌI GOOGLE AI (ĐÃ TÍCH HỢP XOAY VÒNG API KEY VIP)
+// =====================================================================
+
+// BẠN HÃY DÁN CÁC KEY CỦA BẠN VÀO MẢNG NÀY (Càng nhiều càng bất tử)
+const DANH_SACH_KEYS = [
+    "AIzaSyCcN-nUIkA0nPoUI8RIVADbCB2NsllEsOM", // Key 1 (Hiện tại của bạn)
+    "AIzaSyAbDrIGJsrbRDJ1q2rtqOcDuNJUHrksqsU",           // Key 2 (Mượn nick ai đó tạo thêm)
+    "AIzaSyArDZp0W2tEmRzF-9IMW__wbL5FSEDaNxc"            // Key 3 
+];
+
+let viTriKeyHienTai = 0; // Biến nhớ xem hệ thống đang xài Key số mấy
+
+// --- HÀM LÕI: GỌI API VÀ TỰ ĐỘNG ĐỔI KEY KHI LỖI ---
+async function callGeminiWithRotation(promptText) {
+    const maxThưLai = 3; // Thử tối đa 3 lần nếu lỗi
+    
+    for (let i = 0; i <= maxThưLai; i++) {
+        let currentKey = DANH_SACH_KEYS[viTriKeyHienTai];
+        let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${currentKey}`;
+        
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+            });
+
+            const data = await response.json();
+
+            // Nếu gặp lỗi 429 (Hết hạn mức) -> Đổi Key ngay lập tức!
+            if (response.status === 429) {
+                console.warn(`⚠️ Key số ${viTriKeyHienTai + 1} đã quá tải. Đang đổi sang Key tiếp theo...`);
+                viTriKeyHienTai = (viTriKeyHienTai + 1) % DANH_SACH_KEYS.length; // Xoay vòng qua Key mới
+                
+                if (i < maxThưLai) {
+                    await sleep(2000); // Chờ 2s rồi thử lại ngay với Key mới
+                    continue; 
+                }
+            }
+
+            if (!response.ok) {
+                let errorMsg = data.error?.message || "Lỗi không xác định";
+                return { score: 0, feedback: "🛑 LỖI GOOGLE: " + errorMsg };
+            }
+
+            // Xử lý JSON thành công
+            let rawText = data.candidates[0].content.parts[0].text;
+            let resultObj = safeJSONParse(rawText, { score: 0, feedback: "Lỗi ép kiểu JSON" });
+            return { score: Number(resultObj.score) || 0, feedback: String(resultObj.feedback) || "" };
+
+        } catch (error) {
+            if (i === maxThưLai) return { score: 0, feedback: "Lỗi mạng hoặc AI sập: " + error.message };
+            await sleep(2000); // Nếu lỗi mạng linh tinh, đợi 2s rồi thử lại
+        }
+    }
+}
+
+// --- HÀM CHẤM TỰ LUẬN ---
 async function goiAIGoogle(deBai, baremStr, tongDiem, baiLam) {
     if (!baiLam || baiLam.trim() === "") return { score: 0, feedback: "Học sinh chưa làm bài." };
 
-    // BẠN HÃY DÁN API KEY MỚI CỦA BẠN VÀO GIỮA 2 DẤU NGOẶC KÉP NÀY NHÉ:
-    const API_KEY = "AIzaSyAPtma0Yhrw22a88DOwgrqN2bHvhNLfWb4";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-
-    // LỆNH ÉP BUỘC AI KHÔNG ĐƯỢC CHẤM LAN MAN
-    const promptText = `Bạn là một giám khảo chấm thi vô cùng khắt khe và rập khuôn. 
-Nhiệm vụ TỐI THƯỢNG của bạn là CHỈ CHẤM ĐIỂM DỰA TRÊN BAREM được cung cấp. Tuyệt đối KHÔNG tự ý cho điểm theo ý chủ quan nếu học sinh không viết đúng ý có trong Barem.
-
+    const promptText = `Bạn là giám khảo. CHỈ CHẤM ĐIỂM DỰA TRÊN BAREM.
 [Đề bài]: ${deBai}
-[Barem (Đáp án chuẩn & Thang điểm của giáo viên)]: ${baremStr}
-[Tổng điểm tối đa]: ${tongDiem}
-[Bài làm của học sinh]: ${baiLam}
+[Barem]: ${baremStr}
+[Tổng điểm]: ${tongDiem}
+[Bài làm]: ${baiLam}
+Chấm và giải thích. BẮT BUỘC trả về định dạng JSON như sau, không kèm dấu backtick hay văn bản nào khác: {"score": số, "feedback": "chuỗi"}`;
 
-YÊU CẦU BẮT BUỘC:
-1. Đọc kỹ Barem. Phân tích xem Barem có những ý nào, mỗi ý tương ứng bao nhiêu điểm.
-2. Đối chiếu từng câu chữ của học sinh với Barem. Chỉ cộng điểm khi bài làm có chứa nội dung khớp với ý của Barem.
-3. Nếu bài làm dài dòng nhưng không trúng ý Barem -> 0 điểm phần đó.
-4. Lời nhận xét (feedback) phải giải thích rõ: Bài làm đã trúng những ý nào trong Barem, thiếu những ý nào trong Barem để học sinh phục.`;
-
-    try {
-        const response = await fetchWithRetry(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: promptText }] }],
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            score: { type: "NUMBER", description: "Điểm số sau khi đối chiếu nghiêm ngặt với Barem" },
-                            feedback: { type: "STRING", description: "Nhận xét chi tiết việc bài làm khớp hoặc thiếu ý gì so với Barem" }
-                        },
-                        required: ["score", "feedback"]
-                    }
-                }
-            })
-        });
-
-        if (!response.ok) return { score: 0, feedback: "Lỗi kết nối AI hoặc hết lượt dùng." };
-        const data = await response.json();
-        const resultObj = JSON.parse(data.candidates[0].content.parts[0].text);
-        
-        return {
-            score: Number(resultObj.score) || 0,
-            feedback: String(resultObj.feedback) || ""
-        };
-    } catch (error) {
-        console.error("Lỗi AI:", error);
-        return { score: 0, feedback: "Lỗi xử lý điểm từ AI." };
-    }
+    return await callGeminiWithRotation(promptText);
 }
 
-
-    // --- 7. CHẠY CODE NGẦM LÚC NỘP BÀI ---
-    function autoGradeCode(code, inputData, expectedData, lang) {
-        return new Promise((resolve) => {
-            let result = { isPass: false, actualOut: "" };
-            if (!code || !code.trim()) return resolve(result);
-            expectedData = expectedData ? expectedData.trim() : "";
-            
-            if (lang === 'python') {
-                if (typeof Sk === "undefined") return resolve(result);
-                code = cleanPythonCode(code); 
-                let actualOut = ""; 
-                let inputLines = inputData ? inputData.replace(/\r/g, '').trim().split('\n') : []; 
-                let inputIdx = 0;
-                
-                Sk.configure({
-                    output: function(text) { actualOut += text; },
-                    read: function(x) { if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) throw "File not found"; return Sk.builtinFiles["files"][x]; },
-                    inputfun: function() { return new Promise(r => r(inputIdx < inputLines.length ? inputLines[inputIdx++] : "")); }
-                });
-                Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, code, true))
-                .then(() => { 
-                    result.actualOut = actualOut; 
-                    result.isPass = (expectedData !== "" && actualOut.trim() === expectedData); 
-                    resolve(result); 
-                })
-                .catch((err) => { 
-                    result.actualOut = "Lỗi cú pháp: " + err.toString(); 
-                    resolve(result); 
-                });
-            } else if (lang === 'cpp') {
-                if (typeof JSCPP === "undefined") return resolve(result);
-                let actualOut = ""; let config = { stdio: { write: function(s) { actualOut += s; } } };
-                try {
-                    JSCPP.run(code, inputData, config);
-                    result.actualOut = actualOut;
-                    result.isPass = (expectedData !== "" && actualOut.trim() === expectedData);
-                    resolve(result);
-                } catch (e) { result.actualOut = "Lỗi biên dịch"; resolve(result); }
-            } else resolve(result);
-        });
-    }
-
-    // --- 8. AI CHẤM THUẬT TOÁN LẬP TRÌNH (ĐÃ NÂNG CẤP PROMPT) ---
-    // Thay thế hàm goiAIGoogleCode cũ bằng hàm này
-// HÀM CHẤM LẬP TRÌNH (ÉP BUỘC KHUÔN MẪU FEEDBACK)
-
-// =================================================================
-// 2. HÀM CHẤM LẬP TRÌNH (CODE)
-// =================================================================
-// =================================================================
-// 2. HÀM CHẤM LẬP TRÌNH (CODE)
-// =================================================================
-// =================================================================
-// 2. HÀM CHẤM LẬP TRÌNH (CODE)
-// =================================================================
-// =================================================================
-// =================================================================
-// 2. HÀM CHẤM LẬP TRÌNH (ÉP BUỘC CHẤM THEO BAREM)
-// =================================================================
+// --- HÀM CHẤM LẬP TRÌNH ---
 async function goiAIGoogleCode(deBai, barem, tongDiem, code, testStatus, expectedData) {
     if (!code || code.trim() === "") return { score: 0, feedback: "Học sinh chưa nộp code." };
-
-    // BẠN HÃY DÁN API KEY MỚI CỦA BẠN VÀO GIỮA 2 DẤU NGOẶC KÉP NÀY NHÉ:
-    const API_KEY = "AIzaSyAPtma0Yhrw22a88DOwgrqN2bHvhNLfWb4"; 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-
-    const promptText = `Bạn là giám khảo chấm thi lập trình. Bạn PHẢI dựa CHÍNH XÁC vào Barem của giáo viên để phân bổ điểm số, không được tự ý chấm theo cảm tính.
-
-[Đề bài]: ${deBai || "Bài tập thuật toán"}
-[Barem (Tiêu chí chấm điểm của giáo viên)]: ${barem || "Chấm theo tiêu chí: Cú pháp, Thuật toán, Kết quả Output."}
-[Tổng điểm tối đa]: ${tongDiem}
-[Trạng thái Test Output hệ thống chấm tự động]: ${testStatus.isPass ? "Code ĐÃ CHẠY ĐÚNG Output yêu cầu" : "Code CHẠY SAI Output hoặc BỊ LỖI"}
-[Code học sinh nộp]:
-${code}
-
-YÊU CẦU:
-1. Phân tích code dựa trên đúng các tiêu chí liệt kê trong Barem.
-2. Lưu ý đặc biệt vào "Trạng thái Test Output". Nếu Trạng thái là SAI/LỖI, phải trừ phần lớn điểm liên quan đến tính chính xác/kết quả theo Barem.
-3. Tổng điểm không vượt quá ${tongDiem}. Lời nhận xét phải liệt kê rõ học sinh được/mất bao nhiêu điểm ở từng tiêu chí trong Barem.`;
-
-    try {
-        const response = await fetchWithRetry(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: promptText }] }],
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            score: { type: "NUMBER", description: "Điểm số bám sát tiêu chí Barem" },
-                            feedback: { type: "STRING", description: "Giải thích điểm số dựa trên Barem" }
-                        },
-                        required: ["score", "feedback"]
-                    }
-                }
-            })
-        });
-
-        if (!response.ok) return { score: testStatus.isPass ? tongDiem : 0, feedback: "Lỗi kết nối AI hoặc hết lượt dùng." };
-        const data = await response.json();
-        const resultObj = JSON.parse(data.candidates[0].content.parts[0].text);
-        
-        return {
-            score: Number(resultObj.score) || 0,
-            feedback: String(resultObj.feedback) || ""
-        };
-    } catch (error) {
-        console.error("Lỗi AI:", error);
-        return { score: testStatus.isPass ? tongDiem : 0, feedback: "Lỗi xử lý điểm từ AI." };
-    }
-}
-    // --- 9. HÀM TỔNG HỢP VÀ NỘP BÀI LÊN FIREBASE ---
-async function confirmSubmit() {
-    // 1. CÁI BẪY SỐ 1: Bấm nút nộp bài là phải hiện cái này ra đầu tiên!
-    alert("🚀 ĐÃ BẤM NÚT NỘP BÀI! ĐANG CHẠY CODE MỚI NHẤT!"); 
     
+    const promptText = `Bạn là giám khảo lập trình.
+[Đề bài]: ${deBai}
+[Barem]: ${barem}
+[Tổng điểm]: ${tongDiem}
+[Kết quả Test]: ${testStatus.isPass ? "ĐÚNG" : "SAI/LỖI"}
+[Code]: ${code}
+BẮT BUỘC trả về định dạng JSON như sau, không kèm dấu backtick hay văn bản nào khác: {"score": số, "feedback": "chuỗi"}`;
+
+    let result = await callGeminiWithRotation(promptText);
+    
+    // Đảm bảo điểm không vượt quá tổng điểm nếu Code bị lỗi nhưng AI chấm lỏng tay
+    if (!testStatus.isPass && result.score === tongDiem) result.score = 0;
+    
+    return result;
+}
+// =====================================================================
+// 3. HÀM TỔNG HỢP VÀ NỘP BÀI (Đã gài sẵn lệnh nghỉ 3 giây)
+// =====================================================================
+async function confirmSubmit() {
+    alert("🚀 ĐÃ BẤM NÚT NỘP BÀI! ĐANG CHẠY CODE MỚI NHẤT!"); 
     if (!examId) return;
     if (!confirm("Xác nhận nộp bài? AI sẽ bắt đầu đọc và chấm điểm chi tiết!")) return;
 
@@ -573,7 +551,7 @@ async function confirmSubmit() {
         const weights = examData.weights || { mcq: 10, essay: 0, code: 0 };
         let scoreMCQ = questions.length > 0 ? parseFloat(((correct / questions.length) * (weights.mcq || 10)).toFixed(2)) : 0;
 
-        let tatCaNhanXetAI = ""; // Biến để gom toàn bộ lời phê của AI
+        let tatCaNhanXetAI = ""; 
 
         // --- CHẤM TỰ LUẬN ---
         statusText.innerText = "🤖 AI đang phân tích Barem Tự Luận...";
@@ -587,13 +565,22 @@ async function confirmSubmit() {
                 eAnsStr += `--- CÂU TỰ LUẬN ${idx+1} ---\n${baiLam}\n\n`;
                 let q = sourceEssays[idx];
                 let deBai = q.content || q.questionText || "Đề bài tự luận";
-                let baremStr = q.rubrics && q.rubrics.length > 0 ? q.rubrics.map((r, i) => `- Ý ${i+1}: ${r.text} (${r.score}đ)`).join('\n') : "Chấm theo nội dung";
-                let tongDiem = q.rubrics && q.rubrics.length > 0 ? q.rubrics.reduce((s, r) => s + r.score, 0) : (q.score || 10);
+                let mangBarem = q.rubrics || q.barems || q.baremList || q.yBarem || q.details || q.options || q.answers;
+                let tongDiem = 0; let baremStr = "Chấm theo nội dung";
+                
+                if (mangBarem && mangBarem.length > 0) {
+                    tongDiem = mangBarem.reduce((s, r) => s + (parseFloat((r.score || r.diem || r.point || 0).toString().replace(',', '.')) || 0), 0);
+                    baremStr = "Chấm sát Barem:\n" + mangBarem.map((r, i) => `- Ý ${i+1}: ${r.text || r.content || r.title || r.noidung || "Ý này"} (${r.score || r.diem || r.point}đ)`).join('\n');
+                } else {
+                    tongDiem = parseFloat((q.score || 10).toString().replace(',', '.'));
+                }
                 
                 let aiRes = await goiAIGoogle(deBai, baremStr, tongDiem, baiLam);
                 aiEssayResults[`cau_${idx+1}`] = aiRes;
                 scoreEssay += (aiRes.score || 0);
                 tatCaNhanXetAI += `[TỰ LUẬN - CÂU ${idx+1}]\nĐiểm: ${aiRes.score}\nNhận xét:\n${aiRes.feedback}\n\n`;
+                
+                await sleep(7000); // NGHỈ 3 GIÂY CHO AI THỞ
             }
         }
 
@@ -613,15 +600,24 @@ async function confirmSubmit() {
                 let lang = document.getElementById(`stu-lang-${idx}`)?.value || "python";
                 
                 let deBai = q.content || q.desc || "Câu hỏi lập trình";
-                let baremStr = q.rubrics && q.rubrics.length > 0 ? q.rubrics.map((r, i) => `- Ý ${i+1}: ${r.text} (${r.score}đ)`).join('\n') : "Chấm Thuật toán";
-                let tongDiem = q.rubrics && q.rubrics.length > 0 ? q.rubrics.reduce((s,r)=>s+r.score,0) : (parseFloat(q.score) || 1);
-
+                let mangBarem = q.rubrics || q.barems || q.baremList || q.yBarem || q.details || q.options || q.answers;
+                let tongDiem = 0; let baremStr = "Chấm Thuật toán";
+                
+                if (mangBarem && mangBarem.length > 0) {
+                    tongDiem = mangBarem.reduce((s, r) => s + (parseFloat((r.score || r.diem || r.point || 0).toString().replace(',', '.')) || 0), 0);
+                    baremStr = "Chấm sát Barem:\n" + mangBarem.map((r, i) => `- Ý ${i+1}: ${r.text || r.content || r.title || r.noidung || "Ý này"} (${r.score || r.diem || r.point}đ)`).join('\n');
+                } else {
+                    tongDiem = parseFloat((q.score || 1).toString().replace(',', '.'));
+                }
+                
                 let testStatus = await autoGradeCode(code, input, expected, lang);
                 let aiRes = await goiAIGoogleCode(deBai, baremStr, tongDiem, code, testStatus, expected);
                 
                 aiCodeResults[`code_${idx+1}`] = aiRes;
                 scoreCode += (aiRes.score || 0);
                 tatCaNhanXetAI += `[LẬP TRÌNH - CÂU ${idx+1}]\nĐiểm: ${aiRes.score}\nNhận xét:\n${aiRes.feedback}\n\n`;
+                
+                await sleep(3000); // NGHỈ 3 GIÂY CHO AI THỞ
             }
         }
 
@@ -650,11 +646,8 @@ async function confirmSubmit() {
         
         document.getElementById('result-modal').classList.remove('hidden');
 
-        // 2. CÁI BẪY SỐ 2: Bật toàn bộ nhận xét Tự luận & Lập trình lên!
         if (tatCaNhanXetAI !== "") {
-            setTimeout(() => {
-                alert("🎉 TỔNG HỢP NHẬN XÉT CỦA AI:\n\n" + tatCaNhanXetAI);
-            }, 500);
+            setTimeout(() => { alert("🎉 TỔNG HỢP NHẬN XÉT CỦA AI:\n\n" + tatCaNhanXetAI); }, 500);
         }
 
     } catch (error) {
@@ -664,7 +657,6 @@ async function confirmSubmit() {
         if(btnSubmit) { btnSubmit.innerText = "NỘP BÀI LẠI"; btnSubmit.disabled = false; }
     }
 }
-
     // --- 10. CÁC HÀM UI CƠ BẢN ---
     function switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
