@@ -20,6 +20,15 @@
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/JSCPP@2.0.6/dist/JSCPP.es5.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+
+
+
 </head>
 <body class="bg-slate-100 pb-10">
 
@@ -111,9 +120,9 @@
     </div>
 
 <script>
-    // --- 1. CẤU HÌNH API VÀ FIREBASE ---
-    const GEMINI_API_KEY = "AIzaSyCcN-nUIkA0nPoUI8RIVADbCB2NsllEsOM"; 
-    
+    // =====================================================================
+    // 1. CẤU HÌNH API VÀ FIREBASE
+    // =====================================================================
     const firebaseConfig = { 
         apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4", 
         authDomain: "chamcode-b55f7.firebaseapp.com", 
@@ -132,19 +141,59 @@
     
     let examId = null; let examData = null; 
     let questions = []; let answers = {}; let currentIdx = 0;
+    
     window.codeEditors = {}; let timerInterval = null;
+    window.essayEditors = {};
+    window.katex = window.katex || katex;
 
-    // --- 2. HÀM DỌN RÁC INPUT PYTHON (ĐÃ FIX REGEX CHUẨN HƠN) ---
-    // Biến input("Nhập a: ") thành input() một cách an toàn
-    // Thay thế hàm cleanPythonCode cũ bằng hàm này
-function cleanPythonCode(code) {
-    if (!code) return "";
-    // Cách này sẽ "xóa sạch" mọi thứ nằm trong ngoặc của hàm input
-    // Dù học sinh viết input("Nhập a: ") hay input(prompt) đều bị biến thành input()
-    return code.replace(/input\s*\([^)]*\)/g, 'input()');
-}
+    // =====================================================================
+    // 2. HÀM TẠO BÀN PHÍM TOÁN HỌC (ĐÃ BỔ SUNG ĐẦY ĐỦ)
+    // =====================================================================
+    function renderMathKeyboard(idx) {
+        const symbols = ['±','×','÷','≠','≈','≤','≥','=','~','∞','α','β','γ','Δ','δ','θ','λ','μ','π','ρ','σ','φ','ω','Ω','∈','∉','⊂','⊃','∪','∩','∀','∃','∑','∏','∫','∬','∮','∂','∇','°','∠','⊥','△','□','○','→','←','↔','⇒','⇔','↑','↓'];
+        const structures = [
+            { label: 'Phân số', latex: '\\frac{a}{b}' }, { label: 'xⁿ', latex: 'x^{n}' }, { label: 'xₙ', latex: 'x_{n}' },
+            { label: '√x', latex: '\\sqrt{x}' }, { label: 'ⁿ√x', latex: '\\sqrt[n]{x}' }, { label: '|x|', latex: '|x|' },
+            { label: 'Giới hạn', latex: '\\lim_{x \\to \\infty}' }, { label: '∑', latex: '\\sum_{i=1}^{n}' }, { label: '∫', latex: '\\int_{a}^{b}' },
+            { label: 'Hệ PT', latex: '\\begin{cases} x = 1 \\\\ y = 2 \\end{cases}' },
+            { label: 'Ma trận', latex: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}' },
+            { label: 'sin', latex: '\\sin(x)' }, { label: 'cos', latex: '\\cos(x)' }, { label: 'tan', latex: '\\tan(x)' },
+            { label: 'log', latex: '\\log_{a}(x)' }, { label: 'ln', latex: '\\ln(x)' }, { label: 'véc-tơ', latex: '\\vec{v}' },
+            { label: 'Dấu góc', latex: '\\angle A' }, { label: 'Độ (°)', latex: '^\\circ' }
+        ];
 
-    // --- 3. KHỞI ĐỘNG HỆ THỐNG ---
+        let symbolBtns = symbols.map(s => `<button type="button" onclick="insertMathText(${idx}, '${s}')" class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded hover:bg-orange-100 hover:text-orange-600 hover:border-orange-300 transition-colors text-sm font-semibold shadow-sm">${s}</button>`).join('');
+        let structBtns = structures.map(st => `<button type="button" onclick="insertMathFormula(${idx}, '${st.latex.replace(/\\/g, '\\\\')}')" class="px-3 h-10 flex items-center justify-center bg-white border border-slate-200 rounded hover:bg-blue-100 hover:text-blue-600 hover:border-blue-300 transition-colors text-sm font-semibold shadow-sm">${st.label}</button>`).join('');
+
+        return `
+            <div class="mt-4 border-t-2 border-orange-100 pt-4 bg-orange-50/30 p-4 rounded-xl">
+                <p class="text-[11px] font-black text-orange-500 uppercase mb-2 flex items-center gap-1"><span>⚡</span> KÝ HIỆU NHANH:</p>
+                <div class="flex flex-wrap gap-1.5 mb-4">${symbolBtns}</div>
+                <p class="text-[11px] font-black text-blue-600 uppercase mb-2 mt-4 pt-4 border-t border-blue-100 flex items-center gap-1"><span>🧮</span> CẤU TRÚC TOÁN/LÝ/HÓA (CHUẨN LATEX):</p>
+                <div class="flex flex-wrap gap-2">${structBtns}</div>
+            </div>`;
+    }
+
+    window.insertMathText = function(idx, text) {
+        let editor = window.essayEditors[idx]; if(!editor) return;
+        let range = editor.getSelection(true);
+        editor.insertText(range ? range.index : 0, text);
+    };
+
+    window.insertMathFormula = function(idx, latexStr) {
+        let editor = window.essayEditors[idx]; if(!editor) return;
+        let range = editor.getSelection(true);
+        editor.insertEmbed(range ? range.index : 0, 'formula', latexStr);
+    };
+
+    function cleanPythonCode(code) {
+        if (!code) return "";
+        return code.replace(/input\s*\([^)]*\)/g, 'input()');
+    }
+
+    // =====================================================================
+    // 3. KHỞI ĐỘNG HỆ THỐNG VÀ TẢI ĐỀ THI
+    // =====================================================================
     window.onload = function() {
         if (!school || !myName || !myClass) return window.location.href = 'index.html';
         document.getElementById('student-display').innerText = `Học sinh: ${myName} | Lớp: ${myClass}`;
@@ -160,7 +209,6 @@ function cleanPythonCode(code) {
         }, 2000);
     };
 
-    // --- 4. TẢI VÀ RENDER ĐỀ THI ---
     function loadSpecificExam() {
         const selectedExamId = localStorage.getItem('activeExamId');
         if (!selectedExamId) return window.location.href = 'index.html';
@@ -181,6 +229,7 @@ function cleanPythonCode(code) {
             
             let hasEssay = false; const essayContainer = document.getElementById('essay-container');
             const sourceEssays = examData.essays || examData.essayQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'essay') : []);
+            
             if (sourceEssays && sourceEssays.length > 0) {
                 hasEssay = true; document.getElementById('btn-tab-essay').classList.remove('hidden');
                 sourceEssays.forEach((q, idx) => {
@@ -189,9 +238,23 @@ function cleanPythonCode(code) {
                         <div class="mb-8 p-6 bg-slate-50 border rounded-2xl shadow-sm">
                             <h3 class="font-black text-indigo-700 mb-3 text-lg">👉 Câu ${idx + 1}:</h3>
                             <div class="prose max-w-none text-slate-800 mb-4 bg-white p-4 rounded-xl">${qHtml}</div>
-                            <textarea id="essay-ans-${idx}" class="w-full h-32 p-4 border-2 border-indigo-200 rounded-xl outline-none focus:border-indigo-500" placeholder="Gõ câu trả lời tự luận vào đây..."></textarea>
+                            <div class="border-2 border-slate-200 rounded-xl overflow-hidden focus-within:border-indigo-500 transition-colors bg-white">
+                                <div id="essay-editor-${idx}" style="min-height: 200px; font-size: 16px;"></div>
+                                ${renderMathKeyboard(idx)}
+                            </div>
                         </div>`;
                 });
+
+                setTimeout(() => {
+                    sourceEssays.forEach((q, idx) => {
+                        window.essayEditors[idx] = new Quill(`#essay-editor-${idx}`, {
+                            theme: 'snow',
+                            modules: { toolbar: [['bold', 'italic', 'underline', 'strike'], [{ 'script': 'sub'}, { 'script': 'super' }], ['formula', 'image', 'clean']] },
+                            placeholder: 'Nhập nội dung câu tự luận (bạn có thể dùng bộ công cụ Toán/Lý/Hóa bên dưới)...'
+                        });
+                        window.essayEditors[idx].on('text-change', function() { saveDraft(); });
+                    });
+                }, 300);
             }
 
             let hasCode = false; const codeContainer = document.getElementById('code-container');
@@ -202,7 +265,7 @@ function cleanPythonCode(code) {
                 
                 sourceCodes.forEach((q, idx) => {
                     let qHtml = q.content || q.questionHtml || q.desc || "Mô tả đề bài";
-                    let score = q.rubrics ? q.rubrics.reduce((s,r)=>s+r.score,0) : (q.score || 1);
+                    let score = q.rubrics ? q.rubrics.reduce((s,r)=>s+r.score,0) : (q.score || 10);
                     let input = q.testInput || q.input || ""; 
                     let expected = q.expectedOutput || q.expected || ""; 
                     let defaultLang = q.lang || "python";
@@ -214,7 +277,6 @@ function cleanPythonCode(code) {
                             <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full">${score} Điểm</span>
                         </div>
                         <div class="text-slate-800 mb-4 bg-white p-4 border rounded-xl">${qHtml.replace(/\n/g, '<br>')}</div>
-                        
                         <div class="grid grid-cols-2 gap-4 mb-4">
                             <div class="bg-indigo-50 p-3 rounded-lg border">
                                 <p class="text-[10px] font-black text-indigo-500 uppercase mb-1">Input Test</p>
@@ -225,7 +287,6 @@ function cleanPythonCode(code) {
                                 <pre id="stu-expected-${idx}" class="text-sm font-mono text-emerald-700 font-bold bg-white p-2 rounded border border-emerald-200 h-20 overflow-y-auto">${expected || '(Không có)'}</pre>
                             </div>
                         </div>
-
                         <div class="border-2 border-slate-800 rounded-xl overflow-hidden shadow-lg">
                             <div class="bg-slate-800 px-3 py-2 flex justify-between items-center">
                                 <span class="text-white text-xs font-bold">Viết Code:</span>
@@ -236,7 +297,6 @@ function cleanPythonCode(code) {
                             </div>
                             <textarea id="stu-editor-${idx}"></textarea>
                         </div>
-                        
                         <div class="mt-3 bg-slate-800 p-4 rounded-xl">
                             <div class="flex items-center gap-4 mb-2">
                                 <button onclick="runStudentCode(${idx})" class="bg-emerald-500 text-white font-bold py-2 px-5 rounded-lg text-sm hover:bg-emerald-400 shadow-md">▶ Chạy Test Thử</button>
@@ -268,7 +328,9 @@ function cleanPythonCode(code) {
         });
     }
 
-    // --- 5. HỌC SINH CHẠY THỬ CODE ---
+    // =====================================================================
+    // 4. HỌC SINH CHẠY THỬ CODE 
+    // =====================================================================
     window.runStudentCode = function(idx) {
         try {
             const editor = window.codeEditors[idx];
@@ -283,15 +345,12 @@ function cleanPythonCode(code) {
             const outBox = document.getElementById(`stu-output-${idx}`);
 
             if (!code.trim()) return alert("Vui lòng viết code trước khi chạy!");
-            
             statusBox.innerHTML = "<span class='font-bold text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700'>⏳ Đang chạy...</span>";
             outBox.innerText = "⏳ Hệ thống đang biên dịch code..."; 
 
             if (lang === 'python') {
                 if (typeof Sk === "undefined") { outBox.innerText = "❌ Lỗi: Thư viện Python chưa tải xong."; return; }
-                
                 code = cleanPythonCode(code);
-                
                 let inputLines = inputData ? inputData.replace(/\r/g, '').split('\n') : []; 
                 let inputIdx = 0; let actualOut = "";
                 
@@ -333,331 +392,261 @@ function cleanPythonCode(code) {
         else { statusBox.innerHTML = "<span class='font-bold text-xs px-2 py-1 rounded bg-red-100 text-red-700'>❌ CHƯA KHỚP KẾT QUẢ TEST</span>"; }
     }
 
-    // --- 6. AI CHẤM ĐIỂM TỰ LUẬN DỰA THEO BAREM (ĐÃ NÂNG CẤP PROMPT) ---
-    // Thay thế hàm goiAIGoogle cũ bằng hàm này
-// 1. HÀM CHẤM TỰ LUẬN (ÉP AI CHẤM CHI TIẾT THEO BAREM)
-// --- HÀM CHẤM TỰ LUẬN BẰNG GOOGLE GEMINI ---
-// --- HÀM CHẤM TỰ LUẬN BẰNG GOOGLE GEMINI ---
-// =================================================================
-// 1. HÀM CHẤM TỰ LUẬN
-// =================================================================
-// =================================================================
-// HÀM HỖ TRỢ: LÀM SẠCH VÀ ÉP KIỂU JSON AN TOÀN
-// =================================================================
-// =================================================================
-// HÀM HỖ TRỢ 1: LÀM SẠCH VÀ ÉP KIỂU JSON AN TOÀN
-// =================================================================
-function safeJSONParse(text, defaultReturn) {
-    try {
-        // Dọn dẹp sạch sẽ mọi ký tự thừa (```json, ```, khoảng trắng)
-        let cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-        return JSON.parse(cleanText);
-    } catch (e) {
-        console.error("❌ Lỗi Parse JSON! Chuỗi AI trả về bị sai định dạng:", text);
-        return defaultReturn;
-    }
-}
+    // =====================================================================
+    // 5. CÁC HÀM PHỤ TRỢ AI & TÍNH ĐIỂM
+    // =====================================================================
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// =================================================================
-// HÀM HỖ TRỢ: TỰ ĐỘNG THỬ LẠI KHI BỊ NGHẼN MẠNG (LỖI 429)
-// =================================================================
-async function fetchWithRetry(url, options) {
-    const delays = [1000, 2000, 4000, 8000, 16000];
-    for (let i = 0; i < 5; i++) {
+    function safeJSONParse(text, defaultReturn) {
         try {
-            const response = await fetch(url, options);
-            if (response.status === 429 && i < 4) {
-                await new Promise(resolve => setTimeout(resolve, delays[i]));
-                continue;
-            }
-            return response;
-        } catch (error) {
-            if (i === 4) throw error;
-            await new Promise(resolve => setTimeout(resolve, delays[i]));
-        }
+            let cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+            return JSON.parse(cleanText);
+        } catch (e) { return defaultReturn; }
     }
-}
 
-
-
-
-
-
-// =================================================================
-// 1. HÀM CHẤM TỰ LUẬN (ÉP BUỘC CHẤM THEO BAREM)
-// =================================================================
-// =================================================================
-// 1. HÀM CHẤM TỰ LUẬN
-// =================================================================
-// =====================================================================
-// 1. CÁC HÀM PHỤ TRỢ (Ngủ đông & Chạy code ngầm)
-// =====================================================================
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-function autoGradeCode(code, inputData, expectedData, lang) {
-    return new Promise((resolve) => {
-        let result = { isPass: false, actualOut: "" };
-        if (!code || !code.trim()) return resolve(result);
-        expectedData = expectedData ? expectedData.trim() : "";
-        
-        if (lang === 'python') {
-            if (typeof Sk === "undefined") return resolve(result);
-            if (typeof cleanPythonCode === "function") code = cleanPythonCode(code); 
-            let actualOut = ""; 
-            let inputLines = inputData ? inputData.replace(/\r/g, '').trim().split('\n') : []; 
-            let inputIdx = 0;
+    function autoGradeCode(code, inputData, expectedData, lang) {
+        return new Promise((resolve) => {
+            let result = { isPass: false, actualOut: "" };
+            if (!code || !code.trim()) return resolve(result);
+            expectedData = expectedData ? expectedData.trim() : "";
             
-            Sk.configure({
-                output: function(text) { actualOut += text; },
-                read: function(x) { if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) throw "File not found"; return Sk.builtinFiles["files"][x]; },
-                inputfun: function() { return new Promise(r => r(inputIdx < inputLines.length ? inputLines[inputIdx++] : "")); }
-            });
-            Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, code, true))
-            .then(() => { 
-                result.actualOut = actualOut; 
-                result.isPass = (expectedData !== "" && actualOut.trim() === expectedData); 
-                resolve(result); 
-            })
-            .catch((err) => { 
-                result.actualOut = "Lỗi cú pháp: " + err.toString(); 
-                resolve(result); 
-            });
-        } else if (lang === 'cpp') {
-            if (typeof JSCPP === "undefined") return resolve(result);
-            let actualOut = ""; let config = { stdio: { write: function(s) { actualOut += s; } } };
-            try {
-                JSCPP.run(code, inputData, config);
-                result.actualOut = actualOut;
-                result.isPass = (expectedData !== "" && actualOut.trim() === expectedData);
-                resolve(result);
-            } catch (e) { result.actualOut = "Lỗi biên dịch"; resolve(result); }
-        } else resolve(result);
-    });
-}
+            if (lang === 'python') {
+                if (typeof Sk === "undefined") return resolve(result);
+                if (typeof cleanPythonCode === "function") code = cleanPythonCode(code); 
+                let actualOut = ""; 
+                let inputLines = inputData ? inputData.replace(/\r/g, '').trim().split('\n') : []; 
+                let inputIdx = 0;
+                
+                Sk.configure({
+                    output: function(text) { actualOut += text; },
+                    read: function(x) { if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined) throw "File not found"; return Sk.builtinFiles["files"][x]; },
+                    inputfun: function() { return new Promise(r => r(inputIdx < inputLines.length ? inputLines[inputIdx++] : "")); }
+                });
+                Sk.misceval.asyncToPromise(() => Sk.importMainWithBody("<stdin>", false, code, true))
+                .then(() => { 
+                    result.actualOut = actualOut; 
+                    result.isPass = (expectedData !== "" && actualOut.trim() === expectedData); 
+                    resolve(result); 
+                })
+                .catch((err) => { resolve(result); });
+            } else if (lang === 'cpp') {
+                if (typeof JSCPP === "undefined") return resolve(result);
+                let actualOut = ""; let config = { stdio: { write: function(s) { actualOut += s; } } };
+                try {
+                    JSCPP.run(code, inputData, config);
+                    result.actualOut = actualOut;
+                    result.isPass = (expectedData !== "" && actualOut.trim() === expectedData);
+                    resolve(result);
+                } catch (e) { resolve(result); }
+            } else resolve(result);
+        });
+    }
 
-// =====================================================================
-// 2. CÁC HÀM GỌI GOOGLE AI (Đã dùng gemini-1.5-flash siêu mượt)
-// =====================================================================
-// =====================================================================
-// 2. CÁC HÀM GỌI GOOGLE AI (ĐÃ TÍCH HỢP XOAY VÒNG API KEY VIP)
-// =====================================================================
-
-// BẠN HÃY DÁN CÁC KEY CỦA BẠN VÀO MẢNG NÀY (Càng nhiều càng bất tử)
-const DANH_SACH_KEYS = [
-    "AIzaSyCcN-nUIkA0nPoUI8RIVADbCB2NsllEsOM", // Key 1 (Hiện tại của bạn)
-    "AIzaSyAbDrIGJsrbRDJ1q2rtqOcDuNJUHrksqsU",           // Key 2 (Mượn nick ai đó tạo thêm)
-    "AIzaSyArDZp0W2tEmRzF-9IMW__wbL5FSEDaNxc"            // Key 3 
-];
-
-let viTriKeyHienTai = 0; // Biến nhớ xem hệ thống đang xài Key số mấy
-
-// --- HÀM LÕI: GỌI API VÀ TỰ ĐỘNG ĐỔI KEY KHI LỖI ---
-async function callGeminiWithRotation(promptText) {
-    const maxThưLai = 3; // Thử tối đa 3 lần nếu lỗi
+    // ⛔ CHÚ Ý: BẠN HÃY DÁN CÁC API KEY MỚI CỦA BẠN VÀO MẢNG NÀY ĐỂ TRÁNH LỖI DENIED
+    // ==========================================
+    // PHẦN GỌI AI CHẤM ĐIỂM (ĐÃ BẢO MẬT QUA VERCEL)
+    // ==========================================
     
-    for (let i = 0; i <= maxThưLai; i++) {
-        let currentKey = DANH_SACH_KEYS[viTriKeyHienTai];
-        let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${currentKey}`;
+    const API_CHAM_THI = "https://test4-seven-chi.vercel.app/api/cham-bai";
+
+    // 1. Hàm gọi chấm Tự luận
+    async function goiAIGoogle(deBai, baremStr, tongDiem, baiLam) {
+        if (!baiLam || baiLam.trim() === "") return { score: 0, feedback: "Học sinh chưa làm bài." };
         
         try {
-            const response = await fetch(url, {
+            const response = await fetch(API_CHAM_THI, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+                body: JSON.stringify({
+                    type: "essay",
+                    deBai: deBai, 
+                    barem: baremStr, 
+                    tongDiem: tongDiem, 
+                    baiLam: baiLam
+                })
             });
+            return await response.json();
+        } catch (error) {
+            console.error("Lỗi gọi Server chấm thi:", error);
+            return { score: 0, feedback: "Lỗi kết nối Server chấm thi. Vui lòng báo Giám thị." };
+        }
+    }
 
-            const data = await response.json();
+    // 2. Hàm gọi chấm Code Lập trình
+    async function goiAIGoogleCode(deBai, barem, tongDiem, code, testStatus) {
+        if (!code || code.trim() === "") return { score: 0, feedback: "Học sinh chưa nộp code." };
+        
+        try {
+            const response = await fetch(API_CHAM_THI, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: "code",
+                    deBai: deBai, 
+                    barem: barem, 
+                    tongDiem: tongDiem, 
+                    code: code, 
+                    testStatus: testStatus
+                })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error("Lỗi gọi Server chấm thi:", error);
+            return { score: 0, feedback: "Lỗi kết nối Server chấm thi. Vui lòng báo Giám thị." };
+        }
+    }
 
-            // Nếu gặp lỗi 429 (Hết hạn mức) -> Đổi Key ngay lập tức!
-            if (response.status === 429) {
-                console.warn(`⚠️ Key số ${viTriKeyHienTai + 1} đã quá tải. Đang đổi sang Key tiếp theo...`);
-                viTriKeyHienTai = (viTriKeyHienTai + 1) % DANH_SACH_KEYS.length; // Xoay vòng qua Key mới
-                
-                if (i < maxThưLai) {
-                    await sleep(2000); // Chờ 2s rồi thử lại ngay với Key mới
-                    continue; 
+    // =====================================================================
+    // 6. HÀM TỔNG HỢP VÀ NỘP BÀI THI (ĐÃ FIX TỰ LUẬN BỊ RỖNG)
+    // =====================================================================
+    async function confirmSubmit() {
+        if (!examId) return;
+        if (!confirm("Xác nhận nộp bài? AI sẽ bắt đầu đọc và chấm điểm chi tiết!")) return;
+
+        const btnSubmit = document.getElementById('btn-nop-bai');
+        if(btnSubmit) { btnSubmit.innerText = "⏳ ĐANG CHẤM BÀI..."; btnSubmit.disabled = true; }
+        
+        document.getElementById('loading-overlay').classList.remove('hidden');
+        document.getElementById('loading-overlay').classList.add('flex');
+        const statusText = document.getElementById('loading-status');
+
+        try {
+            // --- CHẤM TRẮC NGHIỆM ---
+            statusText.innerText = "⏳ Đang chấm Trắc nghiệm...";
+            let correct = 0;
+            questions.forEach((q, i) => { if ((answers[i] || "") === (q.correctAnswer || q.answer || "")) correct++; });
+            const weights = examData.weights || { mcq: 10, essay: 0, code: 0 };
+            let scoreMCQ = questions.length > 0 ? parseFloat(((correct / questions.length) * (weights.mcq || 10)).toFixed(2)) : 0;
+
+            let tatCaNhanXetAI = ""; 
+
+            // --- CHẤM TỰ LUẬN ---
+            statusText.innerText = "🤖 AI đang phân tích Barem Tự Luận...";
+            let eAnsStr = ""; let scoreEssay = 0; let aiEssayResults = {};
+            const sourceEssays = examData.essays || examData.essayQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'essay') : []);
+            
+            if (sourceEssays && sourceEssays.length > 0) {
+                for (let idx = 0; idx < sourceEssays.length; idx++) {
+                    let baiLam = "";
+                    let htmlContent = "";
+
+                    if (window.essayEditors && window.essayEditors[idx]) {
+                        htmlContent = window.essayEditors[idx].root.innerHTML;
+                        let tempDiv = document.createElement("div");
+                        tempDiv.innerHTML = htmlContent;
+                        
+                        let formulas = tempDiv.querySelectorAll('.ql-formula');
+                        formulas.forEach(f => {
+                            let mathExpr = f.getAttribute('data-value');
+                            let newText = document.createTextNode(` $$${mathExpr}$$ `);
+                            f.parentNode.replaceChild(newText, f);
+                        });
+                        
+                        // Fix lỗi AI chấm 0 điểm do không đọc được HTML
+                        tempDiv.style.display = 'none';
+                        document.body.appendChild(tempDiv);
+                        baiLam = tempDiv.textContent.trim();
+                        document.body.removeChild(tempDiv);
+                    }
+
+                    eAnsStr += `--- CÂU TỰ LUẬN ${idx+1} ---\n${htmlContent}\n\n`;
+                    let q = sourceEssays[idx];
+                    let deBai = q.content || q.questionText || "Đề bài tự luận";
+                    let mangBarem = q.rubrics || q.barems || q.baremList || q.yBarem || q.details || q.options || q.answers;
+                    let tongDiem = 0; let baremStr = "Chấm theo nội dung";
+                    
+                    if (mangBarem && mangBarem.length > 0) {
+                        tongDiem = mangBarem.reduce((s, r) => s + (parseFloat((r.score || r.diem || r.point || 0).toString().replace(',', '.')) || 0), 0);
+                        baremStr = "Chấm sát Barem:\n" + mangBarem.map((r, i) => `- Ý ${i+1}: ${r.text || r.content || r.title || r.noidung || "Ý này"} (${r.score || r.diem || r.point}đ)`).join('\n');
+                    } else {
+                        tongDiem = parseFloat((q.score || 10).toString().replace(',', '.'));
+                    }
+                    
+                    let aiRes = await goiAIGoogle(deBai, baremStr, tongDiem, baiLam);
+                    aiEssayResults[`cau_${idx+1}`] = aiRes;
+                    scoreEssay += (aiRes.score || 0);
+                    tatCaNhanXetAI += `[TỰ LUẬN - CÂU ${idx+1}]\nĐiểm: ${aiRes.score}\nNhận xét:\n${aiRes.feedback}\n\n`;
+                    
+                    await sleep(3000); 
                 }
             }
 
-            if (!response.ok) {
-                let errorMsg = data.error?.message || "Lỗi không xác định";
-                return { score: 0, feedback: "🛑 LỖI GOOGLE: " + errorMsg };
+            // --- CHẤM LẬP TRÌNH ---
+            statusText.innerText = "💻 Đang chạy Test & AI chấm Barem Code...";
+            let cAnsStr = ""; let scoreCode = 0; let aiCodeResults = {};
+            const sourceCodes = examData.codes || examData.codeQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'code') : []);
+            
+            if (sourceCodes && sourceCodes.length > 0) {
+                for (let idx = 0; idx < sourceCodes.length; idx++) {
+                    let q = sourceCodes[idx];
+                    let code = window.codeEditors && window.codeEditors[idx] ? window.codeEditors[idx].getValue().trim() : "";
+                    cAnsStr += `--- CODE CÂU ${idx+1} ---\n${code}\n\n`;
+
+                    let input = document.getElementById(`stu-input-${idx}`) ? document.getElementById(`stu-input-${idx}`).value : (q.testInput || ""); 
+                    let expected = q.expectedOutput || q.expected || ""; 
+                    let lang = document.getElementById(`stu-lang-${idx}`)?.value || "python";
+                    
+                    let deBai = q.content || q.desc || "Câu hỏi lập trình";
+                    let mangBarem = q.rubrics || q.barems || q.baremList || q.yBarem || q.details || q.options || q.answers;
+                    let tongDiem = 0; let baremStr = "Chấm Thuật toán";
+                    
+                    if (mangBarem && mangBarem.length > 0) {
+                        tongDiem = mangBarem.reduce((s, r) => s + (parseFloat((r.score || r.diem || r.point || 0).toString().replace(',', '.')) || 0), 0);
+                        baremStr = "Chấm sát Barem:\n" + mangBarem.map((r, i) => `- Ý ${i+1}: ${r.text || r.content || r.title || r.noidung || "Ý này"} (${r.score || r.diem || r.point}đ)`).join('\n');
+                    } else {
+                        tongDiem = parseFloat((q.score || 10).toString().replace(',', '.'));
+                    }
+                    
+                    let testStatus = await autoGradeCode(code, input, expected, lang);
+                    let aiRes = await goiAIGoogleCode(deBai, baremStr, tongDiem, code, testStatus, expected);
+                    
+                    aiCodeResults[`code_${idx+1}`] = aiRes;
+                    scoreCode += (aiRes.score || 0);
+                    tatCaNhanXetAI += `[LẬP TRÌNH - CÂU ${idx+1}]\nĐiểm: ${aiRes.score}\nNhận xét:\n${aiRes.feedback}\n\n`;
+                    
+                    await sleep(3000); 
+                }
             }
 
-            // Xử lý JSON thành công
-            let rawText = data.candidates[0].content.parts[0].text;
-            let resultObj = safeJSONParse(rawText, { score: 0, feedback: "Lỗi ép kiểu JSON" });
-            return { score: Number(resultObj.score) || 0, feedback: String(resultObj.feedback) || "" };
+            let totalScore = parseFloat((scoreMCQ + scoreEssay + scoreCode).toFixed(2));
+
+            statusText.innerText = "💾 Đang xuất bảng điểm lên Máy chủ...";
+            const resultData = {
+                studentName: myName, className: myClass, examId: examId, examName: examData.name,
+                scoreMCQ: scoreMCQ, scoreEssay: scoreEssay, scoreCode: scoreCode, 
+                totalScore: totalScore, correct: correct, total: questions.length,
+                studentAnswers: answers, studentEssay: eAnsStr, studentCode: cAnsStr, time: new Date().toLocaleString(),
+                aiFeedback: { essay: aiEssayResults, code: aiCodeResults }
+            };
+
+            await db.ref(`schools/${school}/results/${examId}/${myName.replace(/\s/g, '_')}`).set(resultData);
+
+            if(typeof timerInterval !== 'undefined') clearInterval(timerInterval); 
+            localStorage.removeItem(`draft_${examId}_${myName}`);
+            
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('res-name-display').innerText = myName;
+            document.getElementById('res-mcq-score').innerText = scoreMCQ + "đ";
+            document.getElementById('res-essay-score').innerText = scoreEssay + "đ";
+            document.getElementById('res-code-score').innerText = scoreCode + "đ";
+            document.getElementById('res-total-score').innerText = totalScore;
+            
+            document.getElementById('result-modal').classList.remove('hidden');
+
+            if (tatCaNhanXetAI !== "") {
+                setTimeout(() => { alert("🎉 TỔNG HỢP NHẬN XÉT CỦA AI:\n\n" + tatCaNhanXetAI); }, 500);
+            }
 
         } catch (error) {
-            if (i === maxThưLai) return { score: 0, feedback: "Lỗi mạng hoặc AI sập: " + error.message };
-            await sleep(2000); // Nếu lỗi mạng linh tinh, đợi 2s rồi thử lại
+            alert("Lỗi nộp bài: " + error.message);
+            document.getElementById('loading-overlay').classList.add('hidden');
+            if(btnSubmit) { btnSubmit.innerText = "NỘP BÀI LẠI"; btnSubmit.disabled = false; }
         }
     }
-}
 
-// --- HÀM CHẤM TỰ LUẬN ---
-async function goiAIGoogle(deBai, baremStr, tongDiem, baiLam) {
-    if (!baiLam || baiLam.trim() === "") return { score: 0, feedback: "Học sinh chưa làm bài." };
-
-    const promptText = `Bạn là giám khảo. CHỈ CHẤM ĐIỂM DỰA TRÊN BAREM.
-[Đề bài]: ${deBai}
-[Barem]: ${baremStr}
-[Tổng điểm]: ${tongDiem}
-[Bài làm]: ${baiLam}
-Chấm và giải thích. BẮT BUỘC trả về định dạng JSON như sau, không kèm dấu backtick hay văn bản nào khác: {"score": số, "feedback": "chuỗi"}`;
-
-    return await callGeminiWithRotation(promptText);
-}
-
-// --- HÀM CHẤM LẬP TRÌNH ---
-async function goiAIGoogleCode(deBai, barem, tongDiem, code, testStatus, expectedData) {
-    if (!code || code.trim() === "") return { score: 0, feedback: "Học sinh chưa nộp code." };
-    
-    const promptText = `Bạn là giám khảo lập trình.
-[Đề bài]: ${deBai}
-[Barem]: ${barem}
-[Tổng điểm]: ${tongDiem}
-[Kết quả Test]: ${testStatus.isPass ? "ĐÚNG" : "SAI/LỖI"}
-[Code]: ${code}
-BẮT BUỘC trả về định dạng JSON như sau, không kèm dấu backtick hay văn bản nào khác: {"score": số, "feedback": "chuỗi"}`;
-
-    let result = await callGeminiWithRotation(promptText);
-    
-    // Đảm bảo điểm không vượt quá tổng điểm nếu Code bị lỗi nhưng AI chấm lỏng tay
-    if (!testStatus.isPass && result.score === tongDiem) result.score = 0;
-    
-    return result;
-}
-// =====================================================================
-// 3. HÀM TỔNG HỢP VÀ NỘP BÀI (Đã gài sẵn lệnh nghỉ 3 giây)
-// =====================================================================
-async function confirmSubmit() {
-    alert("🚀 ĐÃ BẤM NÚT NỘP BÀI! ĐANG CHẠY CODE MỚI NHẤT!"); 
-    if (!examId) return;
-    if (!confirm("Xác nhận nộp bài? AI sẽ bắt đầu đọc và chấm điểm chi tiết!")) return;
-
-    const btnSubmit = document.getElementById('btn-nop-bai');
-    if(btnSubmit) { btnSubmit.innerText = "⏳ ĐANG CHẤM BÀI..."; btnSubmit.disabled = true; }
-    
-    document.getElementById('loading-overlay').classList.remove('hidden');
-    document.getElementById('loading-overlay').classList.add('flex');
-    const statusText = document.getElementById('loading-status');
-
-    try {
-        statusText.innerText = "⏳ Đang chấm Trắc nghiệm...";
-        let correct = 0;
-        questions.forEach((q, i) => { if ((answers[i] || "") === (q.correctAnswer || q.answer || "")) correct++; });
-        const weights = examData.weights || { mcq: 10, essay: 0, code: 0 };
-        let scoreMCQ = questions.length > 0 ? parseFloat(((correct / questions.length) * (weights.mcq || 10)).toFixed(2)) : 0;
-
-        let tatCaNhanXetAI = ""; 
-
-        // --- CHẤM TỰ LUẬN ---
-        statusText.innerText = "🤖 AI đang phân tích Barem Tự Luận...";
-        let eAnsStr = ""; let scoreEssay = 0; let aiEssayResults = {};
-        const sourceEssays = examData.essays || examData.essayQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'essay') : []);
-        
-        if (sourceEssays && sourceEssays.length > 0) {
-            const essayBoxes = document.querySelectorAll('textarea[id^="essay-ans-"]');
-            for (let idx = 0; idx < essayBoxes.length; idx++) {
-                let baiLam = essayBoxes[idx].value.trim();
-                eAnsStr += `--- CÂU TỰ LUẬN ${idx+1} ---\n${baiLam}\n\n`;
-                let q = sourceEssays[idx];
-                let deBai = q.content || q.questionText || "Đề bài tự luận";
-                let mangBarem = q.rubrics || q.barems || q.baremList || q.yBarem || q.details || q.options || q.answers;
-                let tongDiem = 0; let baremStr = "Chấm theo nội dung";
-                
-                if (mangBarem && mangBarem.length > 0) {
-                    tongDiem = mangBarem.reduce((s, r) => s + (parseFloat((r.score || r.diem || r.point || 0).toString().replace(',', '.')) || 0), 0);
-                    baremStr = "Chấm sát Barem:\n" + mangBarem.map((r, i) => `- Ý ${i+1}: ${r.text || r.content || r.title || r.noidung || "Ý này"} (${r.score || r.diem || r.point}đ)`).join('\n');
-                } else {
-                    tongDiem = parseFloat((q.score || 10).toString().replace(',', '.'));
-                }
-                
-                let aiRes = await goiAIGoogle(deBai, baremStr, tongDiem, baiLam);
-                aiEssayResults[`cau_${idx+1}`] = aiRes;
-                scoreEssay += (aiRes.score || 0);
-                tatCaNhanXetAI += `[TỰ LUẬN - CÂU ${idx+1}]\nĐiểm: ${aiRes.score}\nNhận xét:\n${aiRes.feedback}\n\n`;
-                
-                await sleep(7000); // NGHỈ 3 GIÂY CHO AI THỞ
-            }
-        }
-
-        // --- CHẤM LẬP TRÌNH ---
-        statusText.innerText = "💻 Đang chạy Test & AI chấm Barem Code...";
-        let cAnsStr = ""; let scoreCode = 0; let aiCodeResults = {};
-        const sourceCodes = examData.codes || examData.codeQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'code') : []);
-        
-        if (sourceCodes && sourceCodes.length > 0) {
-            for (let idx = 0; idx < sourceCodes.length; idx++) {
-                let q = sourceCodes[idx];
-                let code = window.codeEditors && window.codeEditors[idx] ? window.codeEditors[idx].getValue().trim() : "";
-                cAnsStr += `--- CODE CÂU ${idx+1} ---\n${code}\n\n`;
-
-                let input = document.getElementById(`stu-input-${idx}`) ? document.getElementById(`stu-input-${idx}`).value : (q.testInput || ""); 
-                let expected = q.expectedOutput || q.expected || ""; 
-                let lang = document.getElementById(`stu-lang-${idx}`)?.value || "python";
-                
-                let deBai = q.content || q.desc || "Câu hỏi lập trình";
-                let mangBarem = q.rubrics || q.barems || q.baremList || q.yBarem || q.details || q.options || q.answers;
-                let tongDiem = 0; let baremStr = "Chấm Thuật toán";
-                
-                if (mangBarem && mangBarem.length > 0) {
-                    tongDiem = mangBarem.reduce((s, r) => s + (parseFloat((r.score || r.diem || r.point || 0).toString().replace(',', '.')) || 0), 0);
-                    baremStr = "Chấm sát Barem:\n" + mangBarem.map((r, i) => `- Ý ${i+1}: ${r.text || r.content || r.title || r.noidung || "Ý này"} (${r.score || r.diem || r.point}đ)`).join('\n');
-                } else {
-                    tongDiem = parseFloat((q.score || 1).toString().replace(',', '.'));
-                }
-                
-                let testStatus = await autoGradeCode(code, input, expected, lang);
-                let aiRes = await goiAIGoogleCode(deBai, baremStr, tongDiem, code, testStatus, expected);
-                
-                aiCodeResults[`code_${idx+1}`] = aiRes;
-                scoreCode += (aiRes.score || 0);
-                tatCaNhanXetAI += `[LẬP TRÌNH - CÂU ${idx+1}]\nĐiểm: ${aiRes.score}\nNhận xét:\n${aiRes.feedback}\n\n`;
-                
-                await sleep(3000); // NGHỈ 3 GIÂY CHO AI THỞ
-            }
-        }
-
-        let totalScore = parseFloat((scoreMCQ + scoreEssay + scoreCode).toFixed(2));
-
-        statusText.innerText = "💾 Đang xuất bảng điểm lên Máy chủ...";
-        const resultData = {
-            studentName: myName, className: myClass, examId: examId, examName: examData.name,
-            scoreMCQ: scoreMCQ, scoreEssay: scoreEssay, scoreCode: scoreCode, 
-            totalScore: totalScore, correct: correct, total: questions.length,
-            studentAnswers: answers, studentEssay: eAnsStr, studentCode: cAnsStr, time: new Date().toLocaleString(),
-            aiFeedback: { essay: aiEssayResults, code: aiCodeResults }
-        };
-
-        await db.ref(`schools/${school}/results/${examId}/${myName.replace(/\s/g, '_')}`).set(resultData);
-
-        if(typeof timerInterval !== 'undefined') clearInterval(timerInterval); 
-        localStorage.removeItem(`draft_${examId}_${myName}`);
-        
-        document.getElementById('loading-overlay').classList.add('hidden');
-        document.getElementById('res-name-display').innerText = myName;
-        document.getElementById('res-mcq-score').innerText = scoreMCQ + "đ";
-        document.getElementById('res-essay-score').innerText = scoreEssay + "đ";
-        document.getElementById('res-code-score').innerText = scoreCode + "đ";
-        document.getElementById('res-total-score').innerText = totalScore;
-        
-        document.getElementById('result-modal').classList.remove('hidden');
-
-        if (tatCaNhanXetAI !== "") {
-            setTimeout(() => { alert("🎉 TỔNG HỢP NHẬN XÉT CỦA AI:\n\n" + tatCaNhanXetAI); }, 500);
-        }
-
-    } catch (error) {
-        console.error(error);
-        alert("Lỗi nộp bài: " + error.message);
-        document.getElementById('loading-overlay').classList.add('hidden');
-        if(btnSubmit) { btnSubmit.innerText = "NỘP BÀI LẠI"; btnSubmit.disabled = false; }
-    }
-}
-    // --- 10. CÁC HÀM UI CƠ BẢN ---
+    // =====================================================================
+    // 7. CÁC HÀM UI CƠ BẢN VÀ LƯU NHÁP
+    // =====================================================================
     function switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
         document.querySelectorAll('.tab-btn').forEach(el => { el.classList.remove('bg-white', 'text-indigo-700'); el.classList.add('bg-indigo-900', 'text-indigo-200'); });
@@ -693,7 +682,11 @@ async function confirmSubmit() {
 
     function saveDraft() {
         if (!examId) return; let eAns = []; let cAns = [];
-        document.querySelectorAll('textarea[id^="essay-ans-"]').forEach(box => eAns.push(box.value));
+        if (window.essayEditors) {
+            Object.keys(window.essayEditors).forEach(idx => {
+                eAns.push(window.essayEditors[idx].root.innerHTML);
+            });
+        }
         const sourceCodes = examData.codes || examData.codeQuestions || (examData.questions ? examData.questions.filter(q => q.type === 'code') : []);
         if(sourceCodes) sourceCodes.forEach((_, idx) => { cAns.push(window.codeEditors[idx] ? window.codeEditors[idx].getValue() : ""); });
         localStorage.setItem(`draft_${examId}_${myName}`, JSON.stringify({ ans: answers, essay: eAns, code: cAns }));
@@ -704,11 +697,18 @@ async function confirmSubmit() {
         if (saved) {
             try {
                 const draft = JSON.parse(saved); answers = draft.ans || {};
-                if (draft.essay) draft.essay.forEach((val, idx) => { const el = document.getElementById(`essay-ans-${idx}`); if(el) el.value = val; });
+                if (draft.essay) {
+                    setTimeout(() => {
+                        draft.essay.forEach((val, idx) => { 
+                            if (window.essayEditors && window.essayEditors[idx]) window.essayEditors[idx].root.innerHTML = val;
+                        });
+                    }, 500); 
+                }
                 if (draft.code) draft.code.forEach((val, idx) => { if(window.codeEditors[idx]) window.codeEditors[idx].setValue(val); });
             } catch (e) {}
         }
     }
+
     function startTimer(min) {
         let t = min * 60; const el = document.getElementById('timer');
         timerInterval = setInterval(() => {
