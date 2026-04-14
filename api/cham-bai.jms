@@ -1,32 +1,39 @@
-module.exports = async function handler(req, res) {
-    // 1. Mở khóa CORS để web của bạn có thể gọi được API này
+export default async function handler(req, res) {
+    // 1. Mở khóa CORS (Cho phép web học sinh gửi dữ liệu qua)
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-    // Bỏ qua bước kiểm tra an ninh ban đầu của trình duyệt
+    // 2. Trình duyệt tự động kiểm tra bảo mật (Preflight OPTIONS)
     if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+        return res.status(200).end();
     }
 
-    // 2. Chỉ cho phép gửi dữ liệu lên (POST)
+    // 3. DÀNH RIÊNG CHO BẠN: Nếu bạn bấm mở link trực tiếp trên trình duyệt để test
+    if (req.method === 'GET') {
+        return res.status(200).json({ 
+            status: "Thành công tuyệt đối", 
+            message: "🚀 API Server ĐÃ LÊN MẠNG THÀNH CÔNG 100%! Vui lòng quay lại web học sinh, nhập câu trả lời và bấm nộp bài để gọi API này chấm điểm nhé." 
+        });
+    }
+
+    // 4. Nếu không phải POST thì chặn lỗi
     if (req.method !== 'POST') {
-        return res.status(405).json({ score: 0, feedback: "Chỉ hỗ trợ phương thức POST" });
+        return res.status(405).json({ score: 0, feedback: "Chỉ hỗ trợ phương thức POST để chấm bài." });
     }
 
-    // 3. Lấy API Key từ Vercel (bạn đã cài đặt thành công ở bước trước)
+    // 5. Lấy API Key Google từ biến môi trường Vercel của bạn
     const API_KEY = process.env.GEMINI_API_KEY;
     if (!API_KEY) {
-        return res.status(500).json({ score: 0, feedback: "Lỗi Server: Chưa cài đặt API Key trên Vercel." });
+        return res.status(500).json({ score: 0, feedback: "Lỗi Server: Chưa có API Key trên Vercel." });
     }
 
+    // 6. Xử lý chấm điểm
     try {
-        const body = req.body;
+        const body = req.body || {};
         let promptText = "";
 
-        // 4. Tạo câu lệnh điều khiển AI (Prompt)
         if (body.type === 'essay') {
             promptText = `Bạn là giáo viên chấm thi tự luận.
             - Đề bài: ${body.deBai}
@@ -45,10 +52,10 @@ module.exports = async function handler(req, res) {
             Hãy chấm điểm (làm tròn đến 0.25) và đưa ra nhận xét.
             YÊU CẦU BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON NÀY, KHÔNG THÊM BẤT KỲ CHỮ NÀO KHÁC: {"score": <số_điểm>, "feedback": "<lời_nhận_xét>"}`;
         } else {
-            return res.status(400).json({ score: 0, feedback: "Loại bài không hợp lệ" });
+            return res.status(400).json({ score: 0, feedback: "Loại bài không hợp lệ." });
         }
 
-        // 5. Gọi thẳng API Google bằng Fetch (Chuẩn Vercel thuần)
+        // Gọi API Google
         const googleUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
         const response = await fetch(googleUrl, {
             method: "POST",
@@ -60,17 +67,15 @@ module.exports = async function handler(req, res) {
         });
 
         if (!response.ok) {
-            console.error("Lỗi từ Google:", await response.text());
             return res.status(500).json({ score: 0, feedback: "Google API bị lỗi hoặc quá tải." });
         }
 
         const data = await response.json();
         const textResult = data.candidates[0].content.parts[0].text;
         
-        // Chuyển text JSON của AI thành Object
+        // Chuyển kết quả thành dạng số điểm và text
         const parsed = JSON.parse(textResult);
 
-        // Trả kết quả về cho web học sinh
         return res.status(200).json({
             score: parsed.score || 0,
             feedback: parsed.feedback || "Đã chấm xong."
