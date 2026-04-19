@@ -1,130 +1,9 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HỆ THỐNG THI THÔNG MINH - Tích Hợp 3 Phần</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/matchbrackets.min.js"></script>
-    
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/JSCPP@2.0.6/dist/JSCPP.es5.min.js"></script>
-
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
-
-
-
-</head>
-<body class="bg-slate-100 pb-10">
-
-    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-40">
-        <div class="max-w-6xl mx-auto p-4 flex justify-between items-center">
-            <div>
-                <h1 id="exam-header-name" class="font-black text-xl uppercase italic tracking-wider">Đang tải đề thi...</h1>
-                <p id="student-display" class="text-xs font-bold text-indigo-200 mt-1 uppercase tracking-widest"></p>
-            </div>
-            <div id="timer" class="bg-white text-red-600 px-4 py-2 rounded-2xl font-mono font-black text-2xl shadow-inner border-2 border-red-100">00:00</div>
-        </div>
-        <div class="bg-indigo-800 px-4 flex justify-center gap-4 pt-2">
-            <button onclick="switchTab('tab-mcq')" id="btn-tab-mcq" class="tab-btn px-6 py-3 bg-white text-indigo-700 font-black rounded-t-xl hidden">Phần 1: Trắc Nghiệm</button>
-            <button onclick="switchTab('tab-essay')" id="btn-tab-essay" class="tab-btn px-6 py-3 bg-indigo-900 text-indigo-200 font-bold rounded-t-xl hidden">Phần 2: Tự Luận</button>
-            <button onclick="switchTab('tab-code')" id="btn-tab-code" class="tab-btn px-6 py-3 bg-indigo-900 text-indigo-200 font-bold rounded-t-xl hidden">Phần 3: Lập Trình</button>
-        </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto p-4 mt-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-        
-        <div class="lg:col-span-1 order-2 lg:order-1">
-            <div class="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-200 sticky top-40">
-                <div id="mcq-nav-box" class="hidden">
-                    <h3 class="font-black text-slate-700 mb-4 text-center uppercase text-xs border-b pb-2 tracking-tighter">Tiến độ Trắc nghiệm</h3>
-                    <div id="question-navigation" class="grid grid-cols-5 gap-2 mb-6"></div>
-                </div>
-                <div class="space-y-3">
-                    <button onclick="saveDraft()" class="w-full bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition-all shadow-md">💾 Lưu Tạm</button>
-                    <button id="btn-nop-bai" onclick="confirmSubmit()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-lg hover:bg-emerald-700 transition-all shadow-lg uppercase">🚀 Nộp Bài Thi</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="lg:col-span-3 order-1 lg:order-2">
-            
-            <div id="tab-mcq" class="tab-content bg-white p-8 rounded-[2.5rem] shadow-md border border-slate-200 min-h-[500px] flex flex-col justify-between hidden">
-                <div id="question-content"></div>
-                <div class="flex justify-between mt-10 pt-6 border-t border-slate-100">
-                    <button id="prev-btn" onclick="changeQuestion(currentIdx - 1)" class="px-8 py-3 rounded-xl font-bold bg-slate-100 text-slate-500 hover:bg-slate-200">← CÂU TRƯỚC</button>
-                    <button id="next-btn" onclick="changeQuestion(currentIdx + 1)" class="px-8 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700">CÂU TIẾP THEO →</button>
-                </div>
-            </div>
-
-            <div id="tab-essay" class="tab-content bg-white p-8 rounded-[2.5rem] shadow-md border border-slate-200 hidden">
-                <h2 class="text-xl font-black text-slate-800 uppercase mb-4 border-b-2 border-indigo-100 pb-2">Đề bài Tự Luận</h2>
-                <div id="essay-container"></div>
-            </div>
-
-            <div id="tab-code" class="tab-content bg-white p-8 rounded-[2.5rem] shadow-md border border-slate-200 hidden">
-                <h2 id="code-header" class="text-xl font-black text-slate-800 uppercase mb-4 border-b-2 border-indigo-100 pb-2">Đề bài Lập Trình</h2>
-                <div id="code-container"></div>
-            </div>
-        </div>
-    </main>
-
-    <div id="loading-overlay" class="fixed inset-0 bg-slate-900/90 z-[100] hidden flex-col justify-center items-center backdrop-blur-sm">
-        <div class="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h2 class="text-white text-xl font-black uppercase tracking-widest text-center">Hệ thống đang thu bài<br>Và AI Đang Phân Tích Barem...</h2>
-        <p class="text-amber-300 text-sm mt-2 font-bold bg-amber-900/50 px-4 py-2 rounded-lg">⚠️ Vui lòng KHÔNG đóng trình duyệt lúc này!</p>
-        <div id="loading-status" class="mt-4 text-emerald-400 font-mono text-sm font-bold">Đang chuẩn bị dữ liệu...</div>
-    </div>
-
-    <div id="result-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md hidden z-[100] flex items-center justify-center p-4">
-        <div class="bg-white rounded-[3rem] p-10 max-w-lg w-full text-center shadow-2xl">
-            <div class="text-6xl mb-4">🏆</div>
-            <h2 class="text-3xl font-black text-slate-800 uppercase mb-1">ĐÃ NỘP BÀI THÀNH CÔNG</h2>
-            <p id="res-name-display" class="font-bold text-indigo-500 mb-6 uppercase"></p>
-            <div class="bg-indigo-50 p-6 rounded-3xl mb-6">
-                <p class="text-xs font-black uppercase text-indigo-400 mb-1">BẢNG ĐIỂM CHI TIẾT</p>
-                <div class="flex justify-between items-center bg-white p-3 rounded-xl mb-2">
-                    <span class="font-bold text-slate-600">Trắc nghiệm:</span>
-                    <span id="res-mcq-score" class="font-black text-xl text-indigo-700">0.0</span>
-                </div>
-                <div class="flex justify-between items-center bg-white p-3 rounded-xl mb-2">
-                    <span class="font-bold text-slate-600">Tự luận (AI Chấm Barem):</span>
-                    <span id="res-essay-score" class="font-black text-xl text-orange-600">0.0</span>
-                </div>
-                <div class="flex justify-between items-center bg-white p-3 rounded-xl mb-4">
-                    <span class="font-bold text-slate-600">Lập trình (AI + Test Code):</span>
-                    <span id="res-code-score" class="font-black text-xl text-emerald-600">0.0</span>
-                </div>
-                <div class="border-t-2 border-indigo-100 pt-3">
-                    <p class="text-sm font-bold text-slate-600">TỔNG ĐIỂM:</p>
-                    <p id="res-total-score" class="text-5xl font-black text-red-600 mt-1">0.0</p>
-                </div>
-            </div>
-            <button onclick="window.location.href='index.html'" class="w-full bg-slate-800 text-white py-4 rounded-2xl font-black text-lg hover:bg-slate-700">HOÀN TẤT & THOÁT</button>
-        </div>
-    </div>
-
 <script>
     // =====================================================================
     // 1. CẤU HÌNH API VÀ FIREBASE
     // =====================================================================
     const firebaseConfig = { 
-        apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4",
+        apiKey: "AIzaSyDZagxoVsRN80fHYRu3N3NSO57tfpmds-4", 
         authDomain: "chamcode-b55f7.firebaseapp.com", 
         databaseURL: "https://chamcode-b55f7-default-rtdb.firebaseio.com", 
         projectId: "chamcode-b55f7", 
@@ -147,7 +26,7 @@
     window.katex = window.katex || katex;
 
     // =====================================================================
-    // 2. HÀM TẠO BÀN PHÍM TOÁN HỌC (ĐÃ BỔ SUNG ĐẦY ĐỦ)
+    // 2. HÀM TẠO BÀN PHÍM TOÁN HỌC
     // =====================================================================
     function renderMathKeyboard(idx) {
         const symbols = ['±','×','÷','≠','≈','≤','≥','=','~','∞','α','β','γ','Δ','δ','θ','λ','μ','π','ρ','σ','φ','ω','Ω','∈','∉','⊂','⊃','∪','∩','∀','∃','∑','∏','∫','∬','∮','∂','∇','°','∠','⊥','△','□','○','→','←','↔','⇒','⇔','↑','↓'];
@@ -442,54 +321,68 @@
         });
     }
 
-    // ⛔ CHÚ Ý: BẠN HÃY DÁN CÁC API KEY MỚI CỦA BẠN VÀO MẢNG NÀY ĐỂ TRÁNH LỖI DENIED
     // ==========================================
-    // PHẦN GỌI AI CHẤM ĐIỂM (ĐÃ BẢO MẬT QUA VERCEL)
+    // PHẦN GỌI AI CHẤM ĐIỂM (CƠ CHẾ 3 KEY LUÂN PHIÊN)
     // ==========================================
     
-    
-    // Khai báo trực tiếp API Key của Gemini tại đây
-    // (Đảm bảo đây là Key Gemini bạn đã tạo nhé, nếu Key khác thì bạn thay vào)
-    const GEMINI_API_KEY = "AIzaSyBYTWGEHZBqZUpaZuSh8rI6YLjruqzEYXM"; 
+    // ⚠️ QUAN TRỌNG: DÁN 3 KEY MỚI TỪ 3 GMAIL KHÁC NHAU VÀO ĐÂY
+    const GEMINI_API_KEYS = [
+        "AIzaSyBWLRPMW_MFQdXANX9dbf3cBpqJ83ZabEE", 
+        "AIzaSyDE3vlPdzuxZ65hhyK-3R4_mAnU_GA-uMY", 
+        "AIzaSyAd6syFi0mYEq7QYZVT0tZYKiwKHD6C0Wo"
+    ];
+
+    // Hàm gọi AI với tính năng tự động nhảy Key nếu lỗi 403
+    async function fetchWithFallback(promptText) {
+        for (let i = 0; i < GEMINI_API_KEYS.length; i++) {
+            const currentKey = GEMINI_API_KEYS[i];
+            
+            // Bỏ qua nếu bạn chưa dán key
+            if (!currentKey || currentKey.includes("DÁN_KEY")) continue;
+
+            console.log(`Đang chấm bằng Key số ${i + 1}...`);
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: promptText }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    return JSON.parse(data.candidates[0].content.parts[0].text);
+                } else {
+                    console.warn(`Key số ${i + 1} bị từ chối/quá tải, tự động chuyển Key tiếp theo...`);
+                }
+            } catch (error) {
+                console.error(`Lỗi kết nối khi dùng Key ${i + 1}:`, error);
+            }
+        }
+        return null; 
+    }
 
     // 1. Hàm gọi chấm Tự luận
     async function goiAIGoogle(deBai, baremStr, tongDiem, baiLam) {
         if (!baiLam || baiLam.trim() === "") return { score: 0, feedback: "Học sinh chưa làm bài." };
         
-        try {
-            // Tạo lời dặn dò cho AI
-            const promptText = `Bạn là giáo viên chấm thi tự luận.
-            - Đề bài: ${deBai}
-            - Barem/Đáp án: ${baremStr}
-            - Tổng điểm tối đa: ${tongDiem}
-            - Bài làm của học sinh: ${baiLam}
-            Hãy chấm điểm (làm tròn đến 0.25) và đưa ra nhận xét.
-            YÊU CẦU BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON NÀY, KHÔNG THÊM BẤT KỲ CHỮ NÀO KHÁC: {"score": <số_điểm>, "feedback": "<lời_nhận_xét>"}`;
+        const promptText = `Bạn là giáo viên chấm thi tự luận.
+        - Đề bài: ${deBai}
+        - Barem/Đáp án: ${baremStr}
+        - Tổng điểm tối đa: ${tongDiem}
+        - Bài làm của học sinh: ${baiLam}
+        Hãy chấm điểm (làm tròn đến 0.25) và đưa ra nhận xét.
+        YÊU CẦU BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON NÀY, KHÔNG THÊM BẤT KỲ CHỮ NÀO KHÁC: {"score": <số_điểm>, "feedback": "<lời_nhận_xét>"}`;
 
-            // Gửi thẳng bài lên Google Gemini
-           const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: { responseMimeType: "application/json" }
-        })
-    });
-
-            const data = await response.json();
-            
-            // Xử lý dữ liệu AI trả về
-            let textResult = data.candidates[0].content.parts[0].text;
-            let resultObj = JSON.parse(textResult);
-            
-            return {
-                score: Number(resultObj.score) || 0,
-                feedback: String(resultObj.feedback) || ""
-            };
-
-        } catch (error) {
-            console.error("Lỗi AI chấm tự luận:", error);
-            return { score: 0, feedback: "Lỗi kết nối AI. Vui lòng thử nộp lại bài!" };
+        const resultObj = await fetchWithFallback(promptText);
+        
+        if (resultObj) {
+            return { score: Number(resultObj.score) || 0, feedback: String(resultObj.feedback) || "" };
+        } else {
+            return { score: 0, feedback: "Lỗi Hệ Thống: Không có API Key nào hoạt động!" };
         }
     }
 
@@ -497,46 +390,26 @@
     async function goiAIGoogleCode(deBai, barem, tongDiem, code, testStatus) {
         if (!code || code.trim() === "") return { score: 0, feedback: "Học sinh chưa nộp code." };
         
-        try {
-            // Tạo lời dặn dò cho AI
-            const promptText = `Bạn là giáo viên chấm thi Lập trình.
-            - Đề bài: ${deBai}
-            - Barem/Yêu cầu: ${barem}
-            - Tổng điểm tối đa: ${tongDiem}
-            - Code của học sinh: ${code}
-            - Trạng thái chạy test: ${JSON.stringify(testStatus)}
-            Hãy chấm điểm (làm tròn đến 0.25) và đưa ra nhận xét.
-            YÊU CẦU BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON NÀY, KHÔNG THÊM BẤT KỲ CHỮ NÀO KHÁC: {"score": <số_điểm>, "feedback": "<lời_nhận_xét>"}`;
+        const promptText = `Bạn là giáo viên chấm thi Lập trình.
+        - Đề bài: ${deBai}
+        - Barem/Yêu cầu: ${barem}
+        - Tổng điểm tối đa: ${tongDiem}
+        - Code của học sinh: ${code}
+        - Trạng thái chạy test: ${JSON.stringify(testStatus)}
+        Hãy chấm điểm (làm tròn đến 0.25) và đưa ra nhận xét.
+        YÊU CẦU BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON NÀY, KHÔNG THÊM BẤT KỲ CHỮ NÀO KHÁC: {"score": <số_điểm>, "feedback": "<lời_nhận_xét>"}`;
 
-            // Gửi thẳng bài lên Google Gemini
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: { responseMimeType: "application/json" }
-        })
-    });
-
-            const data = await response.json();
-            
-            // Xử lý dữ liệu AI trả về
-            let textResult = data.candidates[0].content.parts[0].text;
-            let resultObj = JSON.parse(textResult);
-            
-            return {
-                score: Number(resultObj.score) || 0,
-                feedback: String(resultObj.feedback) || ""
-            };
-
-        } catch (error) {
-            console.error("Lỗi AI chấm code:", error);
-            return { score: 0, feedback: "Lỗi kết nối AI. Vui lòng thử nộp lại bài!" };
+        const resultObj = await fetchWithFallback(promptText);
+        
+        if (resultObj) {
+            return { score: Number(resultObj.score) || 0, feedback: String(resultObj.feedback) || "" };
+        } else {
+            return { score: 0, feedback: "Lỗi Hệ Thống: Không có API Key nào hoạt động!" };
         }
     }
 
     // =====================================================================
-    // 6. HÀM TỔNG HỢP VÀ NỘP BÀI THI (ĐÃ FIX TỰ LUẬN BỊ RỖNG)
+    // 6. HÀM TỔNG HỢP VÀ NỘP BÀI THI
     // =====================================================================
     async function confirmSubmit() {
         if (!examId) return;
@@ -581,7 +454,6 @@
                             f.parentNode.replaceChild(newText, f);
                         });
                         
-                        // Fix lỗi AI chấm 0 điểm do không đọc được HTML
                         tempDiv.style.display = 'none';
                         document.body.appendChild(tempDiv);
                         baiLam = tempDiv.textContent.trim();
@@ -755,7 +627,5 @@
             if (--t < 0) { clearInterval(timerInterval); alert("Hết giờ! Hệ thống tự động nộp bài."); confirmSubmit(); }
         }, 1000);
     }
-    
+
 </script>
-</body>
-</html>
